@@ -1,22 +1,9 @@
 ---
-- name: create OSE master http proxy for GCE health check
-  copy:
-    dest: /etc/systemd/system/kube-http-proxy.service
-    content: |
-      [Unit]
-      Description=Openshift kube http proxy daemon
-      After=network.target
+- name: install haproxy
+  package: name=haproxy state=present
 
-      [Service]
-      Type=simple
-      ExecStart=/usr/bin/kubectl proxy -p 8080 --address=0.0.0.0 --accept-hosts=^*$ --config=/etc/origin/master/admin.kubeconfig
-      Restart=always
-      RestartSec=5s
+- name: configure haproxy
+  template: src=haproxy.cfg.j2 dest=/etc/haproxy/haproxy.cfg
 
-      [Install]
-      WantedBy=multi-user.target
-  notify:
-    - reload systemd
-
-- name: start OSE master http proxy
-  service: name=kube-http-proxy state=started enabled=yes
+- name: start and enable haproxy service
+  service: name=haproxy state=started enabled=yes
