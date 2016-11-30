@@ -1,0 +1,6 @@
+---
+- name: Templatize provision script
+  template: src=provision.j2.sh dest=/tmp/provision.sh mode=u+rx
+
+- name: Provision GCE resources
+  command: /tmp/provision.sh
