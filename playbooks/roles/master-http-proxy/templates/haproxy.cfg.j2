@@ -65,4 +65,4 @@ frontend  http-proxy *:8080
     use_backend  ocp          if url_healthz
 
 backend ocp
-    server       ocp localhost:{{ console_port }} ssl verify none
+    server       ocp localhost:{{ internal_console_port }} ssl verify none

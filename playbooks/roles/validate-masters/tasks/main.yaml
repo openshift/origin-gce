@@ -7,13 +7,13 @@
      method: GET
 - name: Validate the internal address
   uri:
-     url: "https://{{ openshift_master_cluster_hostname }}:{{ console_port }}/healthz/ready"
+     url: "https://{{ openshift_master_cluster_hostname }}:{{ internal_console_port }}/healthz/ready"
      validate_certs: False
      status_code: 200
      method: GET
 - name: Validate the master address
   uri:
-     url: "https://{{ inventory_hostname }}:{{ console_port }}/healthz/ready"
+     url: "https://{{ inventory_hostname }}:{{ internal_console_port }}/healthz/ready"
      validate_certs: False
      status_code: 200
      method: GET
