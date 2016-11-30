@@ -13,10 +13,11 @@
   roles:
     - validate-masters
 
-- hosts: masters
-  gather_facts: yes
-  roles:
-    - validate-etcd
+# Not useful
+# - hosts: masters
+#  gather_facts: yes
+#  roles:
+#    - validate-etcd
 
 # Temporarily disabled
 # - hosts: primary_master
