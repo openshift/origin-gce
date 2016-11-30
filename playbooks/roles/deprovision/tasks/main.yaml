@@ -1,0 +1,6 @@
+---
+- name: Templatize de-provision script
+  template: src=deprovision.j2.sh dest=/tmp/deprovision.sh mode=u+rx
+
+- name: De-provision GCE resources
+  command: /tmp/deprovision.sh

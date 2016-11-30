@@ -77,7 +77,6 @@ declare -A FW_RULES=(
   ['infra-node-internal']="--allow tcp:5000 --source-tags ocp --target-tags ocp-infra-node"
   ['infra-node-external']="--allow tcp:80,tcp:443,tcp:1936 --target-tags ocp-infra-node"
 )
-BASTION_SSH_FW_RULE="{{ provision_prefix }}bastion-ssh-to-external-ip"
 
 # Create firewall rules
 for rule in "${!FW_RULES[@]}"; do

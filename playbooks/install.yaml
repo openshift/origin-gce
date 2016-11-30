@@ -28,7 +28,7 @@
         - service: master http proxy
           port: 8080/tcp
 
-- include: openshift-setup.yaml
+- include: setup.yaml
 
 - hosts: infra_nodes
   gather_facts: no
