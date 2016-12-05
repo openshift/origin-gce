@@ -1,4 +1,7 @@
 ---
+- name: Templatize environment script
+  template: src=inventory.j2.sh dest=/tmp/inventory.sh mode=u+rx
+
 - name: Templatize provision script
   template: src=provision.j2.sh dest=/tmp/provision.sh mode=u+rx
 

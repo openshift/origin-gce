@@ -48,7 +48,7 @@
   register: secrets
 
 - name: Create registry secrets
-  command: oc secrets new dockerregistry /root/config.yml
+  command: oc secrets new dockerregistry /root/config.yml {{ gcs_registry_keyfile }}
   when: "'dockerregistry' not in secrets.stdout"
 
 - name: Determine if service account contains secrets

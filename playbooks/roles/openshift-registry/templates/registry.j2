@@ -7,8 +7,9 @@ storage:
   cache:
     layerinfo: inmemory
   gcs:
-    bucket: "{{ gcs_registry_bucket }}"
+    bucket: "{{ provision_gce_registry_gcs_bucket }}"
     rootdirectory: /registry
+    keyfile: /etc/registryconfig/gcs-registry.json
 auth:
   openshift:
     realm: openshift

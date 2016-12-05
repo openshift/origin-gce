@@ -24,7 +24,7 @@ fi
 metadata=""
 if [[ -n "{{ provision_gce_startup_script_file }}" ]]; then
     if [[ ! -f "{{ provision_gce_startup_script_file }}" ]]; then
-        echo "Startup script file missing at {{ provision_gce_startup_script_file }}"
+        echo "Startup script file missing at {{ provision_gce_startup_script_file }} from=$(pwd)"
         exit 1
     fi
     metadata+="--metadata-from-file=startup-script={{ provision_gce_startup_script_file }}"
@@ -44,17 +44,17 @@ fi
 
 
 if ! gcloud --project "{{ gce_project_id }}" compute images describe "{{ provision_gce_registered_image }}" &>/dev/null; then
-    "${DIR}/gcloud-image.sh"
+    echo "No compute image found, create an image named '{{ provision_gce_registered_image }}' to continue'"
+    exit 1
 fi
 
 ### PROVISION THE INFRASTRUCTURE ###
 
 # Check the DNS managed zone in Google Cloud DNS, create it if it doesn't exist and exit after printing NS servers
-if ! gcloud --project "{{ gce_project_id }}" dns managed-zones describe "{{ provision_prefix }}managed-zone" &>/dev/null; then
-    echo "DNS zone '{{ provision_prefix }}managed-zone' doesn't exist. It will be created and installation will stop. Please configure the following NS servers for your domain in your domain provider before proceeding with the installation:"
-    gcloud --project "{{ gce_project_id }}" dns managed-zones create "{{ provision_prefix }}managed-zone" --dns-name "{{ public_hosted_zone }}" --description "{{ public_hosted_zone }} domain"
-    gcloud --project "{{ gce_project_id }}" dns managed-zones describe "{{ provision_prefix }}managed-zone" --format='value(nameServers)' | tr ';' '\n'
-    exit 2
+if ! gcloud --project "{{ gce_project_id }}" dns managed-zones describe "{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}" &>/dev/null; then
+    echo "DNS zone '{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}' doesn't exist. Please configure the following NS servers for your domain in your domain provider before proceeding with the installation:"
+    gcloud --project "{{ gce_project_id }}" dns managed-zones create "{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}" --dns-name "{{ public_hosted_zone }}" --description "{{ public_hosted_zone }} domain"
+    gcloud --project "{{ gce_project_id }}" dns managed-zones describe "{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}" --format='value(nameServers)' | tr ';' '\n'
 fi
 
 # Create network
@@ -114,54 +114,54 @@ for i in `jobs -p`; do wait $i; done
 # Create instance templates
 (
 if ! gcloud --project "{{ gce_project_id }}" compute instance-templates describe "{{ provision_prefix }}instance-template-master" &>/dev/null; then
-    gcloud --project "{{ gce_project_id }}" compute instance-templates create "{{ provision_prefix }}instance-template-master" --machine-type "{{ provision_gce_machine_type_master }}" --network "{{ provision_prefix }}ocp-network" --tags "ocp,ocp-master" --image "{{ provision_gce_registered_image }}" --boot-disk-size "35" --boot-disk-type "pd-ssd" --scopes logging-write,monitoring-write,useraccounts-ro,service-control,service-management,storage-ro,compute-rw ${metadata}
+    gcloud --project "{{ gce_project_id }}" compute instance-templates create "{{ provision_prefix }}instance-template-master" --machine-type "{{ provision_gce_machine_type_master }}" --network "{{ provision_prefix }}ocp-network" --tags "{{ provision_prefix }}ocp,ocp,ocp-master{{ gce_extra_tags_master }}" --image "{{ provision_gce_registered_image }}" --boot-disk-size "35" --boot-disk-type "pd-ssd" --scopes logging-write,monitoring-write,useraccounts-ro,service-control,service-management,storage-ro,compute-rw ${metadata}
 else
     echo "Instance template '{{ provision_prefix }}instance-template-master' already exists"
 fi
 
 # Create Master instance group
-if ! gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed describe "{{ provision_prefix }}instance-group-master" --zone "{{ gce_zone_name }}" &>/dev/null; then
-    gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed create "{{ provision_prefix }}instance-group-master" --zone "{{ gce_zone_name }}" --template "{{ provision_prefix }}instance-template-master" --size "{{ provision_prefix }}instance-group-size-master"
-    gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed set-named-ports "{{ provision_prefix }}instance-group-master" --zone "{{ gce_zone_name }}" --named-ports "{{ provision-prefix }}-port-name-master:{{ internal_console_port }}"
+if ! gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed describe "{{ provision_prefix }}ig-m" --zone "{{ gce_zone_name }}" &>/dev/null; then
+    gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed create "{{ provision_prefix }}ig-m" --zone "{{ gce_zone_name }}" --template "{{ provision_prefix }}instance-template-master" --size "{{ provision_gce_instance_group_size_master }}"
+    gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed set-named-ports "{{ provision_prefix }}ig-m" --zone "{{ gce_zone_name }}" --named-ports "{{ provision_prefix }}-port-name-master:{{ internal_console_port }}"
 else
-    echo "Instance group '{{ provision_prefix }}instance-group-master' already exists"
+    echo "Instance group '{{ provision_prefix }}ig-m' already exists"
 fi
 ) &
 
 (
 if ! gcloud --project "{{ gce_project_id }}" compute instance-templates describe "{{ provision_prefix }}instance-template-node" &>/dev/null; then
-    gcloud --project "{{ gce_project_id }}" compute instance-templates create "{{ provision_prefix }}instance-template-node" --machine-type "{{ provision_gce_machine_type_node }}" --network "{{ provision_prefix }}ocp-network" --tags "ocp,ocp-node" --image "{{ provision_gce_registered_image }}" --boot-disk-size "25" --boot-disk-type "pd-ssd" --scopes logging-write,monitoring-write,useraccounts-ro,service-control,service-management,storage-ro,compute-rw ${metadata}
+    gcloud --project "{{ gce_project_id }}" compute instance-templates create "{{ provision_prefix }}instance-template-node" --machine-type "{{ provision_gce_machine_type_node }}" --network "{{ provision_prefix }}ocp-network" --tags "{{ provision_prefix }}ocp,ocp,ocp-node{{ gce_extra_tags_node }}" --image "{{ provision_gce_registered_image }}" --boot-disk-size "25" --boot-disk-type "pd-ssd" --scopes logging-write,monitoring-write,useraccounts-ro,service-control,service-management,storage-ro,compute-rw ${metadata}
 else
     echo "Instance template '{{ provision_prefix }}instance-template-node' already exists"
 fi
 
 # Create Node instance group
-if ! gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed describe "{{ provision_prefix }}instance-group-node" --zone "{{ gce_zone_name }}" &>/dev/null; then
-    gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed create "{{ provision_prefix }}instance-group-node" --zone "{{ gce_zone_name }}" --template "{{ provision_prefix }}instance-template-node" --size "{{ provision_prefix }}instance-group-size-node"
+if ! gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed describe "{{ provision_prefix }}ig-n" --zone "{{ gce_zone_name }}" &>/dev/null; then
+    gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed create "{{ provision_prefix }}ig-n" --zone "{{ gce_zone_name }}" --template "{{ provision_prefix }}instance-template-node" --size "{{ provision_gce_instance_group_size_node }}"
 else
-    echo "Instance group '{{ provision_prefix }}instance-group-node' already exists"
+    echo "Instance group '{{ provision_prefix }}ig-n' already exists"
 fi
 ) &
 
 (
 if ! gcloud --project "{{ gce_project_id }}" compute instance-templates describe "{{ provision_prefix }}instance-template-node-infra" &>/dev/null; then
-    gcloud --project "{{ gce_project_id }}" compute instance-templates create "{{ provision_prefix }}instance-template-node-infra" --machine-type "{{ provision_gce_machine_type_node_infra }}" --network "{{ provision_prefix }}ocp-network" --tags "ocp,ocp-infra-node" --image "{{ provision_gce_registered_image }}" --boot-disk-size "25" --boot-disk-type "pd-ssd" --scopes logging-write,monitoring-write,useraccounts-ro,service-control,service-management,storage-rw,compute-rw ${metadata}
+    gcloud --project "{{ gce_project_id }}" compute instance-templates create "{{ provision_prefix }}instance-template-node-infra" --machine-type "{{ provision_gce_machine_type_node_infra }}" --network "{{ provision_prefix }}ocp-network" --tags "{{ provision_prefix }}ocp,ocp,ocp-infra-node{{ gce_extra_tags_node_infra }}" --image "{{ provision_gce_registered_image }}" --boot-disk-size "25" --boot-disk-type "pd-ssd" --scopes logging-write,monitoring-write,useraccounts-ro,service-control,service-management,storage-rw,compute-rw ${metadata}
 else
     echo "Instance template '{{ provision_prefix }}instance-template-node-infra' already exists"
 fi
 
 # Create Infra node instance group
-if ! gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed describe "{{ provision_prefix }}instance-group-node-infra" --zone "{{ gce_zone_name }}" &>/dev/null; then
-        gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed create "{{ provision_prefix }}instance-group-node-infra" --zone "{{ gce_zone_name }}" --template "{{ provision_prefix }}instance-template-node-infra" --size "{{ provision_prefix }}instance-group-size-node-infra"
+if ! gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed describe "{{ provision_prefix }}ig-i" --zone "{{ gce_zone_name }}" &>/dev/null; then
+        gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed create "{{ provision_prefix }}ig-i" --zone "{{ gce_zone_name }}" --template "{{ provision_prefix }}instance-template-node-infra" --size "{{ provision_gce_instance_group_size_node_infra }}"
 else
-    echo "Instance group '{{ provision_prefix }}instance-group-node-infra' already exists"
+    echo "Instance group '{{ provision_prefix }}ig-i' already exists"
 fi
 ) &
 
 for i in `jobs -p`; do wait $i; done
 
 # Attach additional disks to instances for docker storage
-instances=$(gcloud --project "{{ gce_project_id }}" compute instances list --filter='tags.items:ocp' --format='value(name)')
+instances=$(gcloud --project "{{ gce_project_id }}" compute instances list --filter='tags.items:{{ provision_prefix }}ocp AND tags.items:ocp' --format='value(name)')
 for i in $instances; do
     ( docker_disk="${i}-docker"
     instance_zone=$(gcloud --project "{{ gce_project_id }}" compute instances list --filter="name:${i}" --format='value(zone)')
@@ -174,7 +174,7 @@ for i in $instances; do
 done
 
 # Attach additional disks to node instances for openshift storage
-instances=$(gcloud --project "{{ gce_project_id }}" compute instances list --filter='tags.items:ocp-node OR tags.items:ocp-infra-node' --format='value(name)')
+instances=$(gcloud --project "{{ gce_project_id }}" compute instances list --filter='tags.items:{{ provision_prefix }}ocp AND (tags.items:ocp-node OR tags.items:ocp-infra-node)' --format='value(name)')
 for i in $instances; do
     ( openshift_disk="${i}-openshift"
     instance_zone=$(gcloud --project "{{ gce_project_id }}" compute instances list --filter="name:${i}" --format='value(zone)')
@@ -198,8 +198,8 @@ fi
 
 # Master backend service
 if ! gcloud --project "{{ gce_project_id }}" beta compute backend-services describe "{{ provision_prefix }}master-ssl-lb-backend" &>/dev/null; then
-    gcloud --project "{{ gce_project_id }}" beta compute backend-services create "{{ provision_prefix }}master-ssl-lb-backend" --health-checks "{{ provision_prefix }}master-ssl-lb-health-check" --port-name "{{ provision-prefix }}-port-name-master" --protocol "SSL" --global
-    gcloud --project "{{ gce_project_id }}" beta compute backend-services add-backend "{{ provision_prefix }}master-ssl-lb-backend" --instance-group "{{ provision_prefix }}instance-group-master" --global --instance-group-zone "{{ gce_zone_name }}"
+    gcloud --project "{{ gce_project_id }}" beta compute backend-services create "{{ provision_prefix }}master-ssl-lb-backend" --health-checks "{{ provision_prefix }}master-ssl-lb-health-check" --port-name "{{ provision_prefix }}-port-name-master" --protocol "SSL" --global
+    gcloud --project "{{ gce_project_id }}" beta compute backend-services add-backend "{{ provision_prefix }}master-ssl-lb-backend" --instance-group "{{ provision_prefix }}ig-m" --global --instance-group-zone "{{ gce_zone_name }}"
 else
     echo "Backend service '{{ provision_prefix }}master-ssl-lb-backend' already exists"
 fi
@@ -236,7 +236,7 @@ fi
 # Master forwarding rule
 if ! gcloud --project "{{ gce_project_id }}" compute forwarding-rules describe "{{ provision_prefix }}master-ssl-lb-rule" --global &>/dev/null; then
     IP=$(gcloud --project "{{ gce_project_id }}" compute addresses describe "{{ provision_prefix }}master-ssl-lb-ip" --global --format='value(address)')
-    gcloud --project "{{ gce_project_id }}" compute forwarding-rules create "{{ provision_prefix }}master-ssl-lb-rule" --address "$IP" --global --ports "80:65335" --target-ssl-proxy "{{ provision_prefix }}master-ssl-lb-target"
+    gcloud --project "{{ gce_project_id }}" compute forwarding-rules create "{{ provision_prefix }}master-ssl-lb-rule" --address "$IP" --global --ports "{{ console_port }}" --target-ssl-proxy "{{ provision_prefix }}master-ssl-lb-target"
 else
     echo "Forwarding rule '{{ provision_prefix }}master-ssl-lb-rule' already exists"
 fi
@@ -253,7 +253,7 @@ fi
 # Internal master target pool
 if ! gcloud --project "{{ gce_project_id }}" compute target-pools describe "{{ provision_prefix }}master-network-lb-pool" --region "{{ gce_region_name }}" &>/dev/null; then
     gcloud --project "{{ gce_project_id }}" compute target-pools create "{{ provision_prefix }}master-network-lb-pool" --http-health-check "{{ provision_prefix }}master-network-lb-health-check" --region "{{ gce_region_name }}"
-    gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed set-target-pools "{{ provision_prefix }}instance-group-master" --target-pools "{{ provision_prefix }}master-network-lb-pool" --zone "{{ gce_zone_name }}"
+    gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed set-target-pools "{{ provision_prefix }}ig-m" --target-pools "{{ provision_prefix }}master-network-lb-pool" --zone "{{ gce_zone_name }}"
 else
     echo "Target pool '{{ provision_prefix }}master-network-lb-pool' already exists"
 fi
@@ -278,7 +278,7 @@ fi
 # Router target pool
 if ! gcloud --project "{{ gce_project_id }}" compute target-pools describe "{{ provision_prefix }}router-network-lb-pool" --region "{{ gce_region_name }}" &>/dev/null; then
     gcloud --project "{{ gce_project_id }}" compute target-pools create "{{ provision_prefix }}router-network-lb-pool" --http-health-check "{{ provision_prefix }}router-network-lb-health-check" --region "{{ gce_region_name }}"
-    gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed set-target-pools "{{ provision_prefix }}instance-group-{{ provision_gce_router_network_instance_group }}" --target-pools "{{ provision_prefix }}router-network-lb-pool" --zone "{{ gce_zone_name }}"
+    gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed set-target-pools "{{ provision_prefix }}{{ provision_gce_router_network_instance_group }}" --target-pools "{{ provision_prefix }}router-network-lb-pool" --zone "{{ gce_zone_name }}"
 else
     echo "Target pool '{{ provision_prefix }}router-network-lb-pool' already exists"
 fi
@@ -295,45 +295,45 @@ fi
 for i in `jobs -p`; do wait $i; done
 
 # DNS record for master lb
-dns="$TMPDIR/dns.yaml"
+dns="${TMPDIR:-/tmp}/dns.yaml"
 rm -f $dns
 
-if ! gcloud --project "{{ gce_project_id }}" dns record-sets list -z "{{ provision_prefix }}managed-zone" --name "{{ openshift_master_cluster_public_hostname }}" 2>/dev/null | grep -q "{{ openshift_master_cluster_public_hostname }}"; then
+if ! gcloud --project "{{ gce_project_id }}" dns record-sets list -z "{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}" --name "{{ openshift_master_cluster_public_hostname }}" 2>/dev/null | grep -q "{{ openshift_master_cluster_public_hostname }}"; then
     IP=$(gcloud --project "{{ gce_project_id }}" compute addresses describe "{{ provision_prefix }}master-ssl-lb-ip" --global --format='value(address)')
     if [[ ! -f $dns ]]; then
-        gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns start -z "{{ provision_prefix }}managed-zone"
+        gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns start -z "{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}"
     fi
-    gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns add -z "{{ provision_prefix }}managed-zone" --ttl 3600 --name "{{ openshift_master_cluster_public_hostname }}." --type A "$IP"
+    gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns add -z "{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}" --ttl 3600 --name "{{ openshift_master_cluster_public_hostname }}." --type A "$IP"
 else
     echo "DNS record for '{{ openshift_master_cluster_public_hostname }}' already exists"
 fi
 
 # DNS record for internal master lb
-if ! gcloud --project "{{ gce_project_id }}" dns record-sets list -z "{{ provision_prefix }}managed-zone" --name "{{ openshift_master_cluster_hostname }}" 2>/dev/null | grep -q "{{ openshift_master_cluster_hostname }}"; then
+if ! gcloud --project "{{ gce_project_id }}" dns record-sets list -z "{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}" --name "{{ openshift_master_cluster_hostname }}" 2>/dev/null | grep -q "{{ openshift_master_cluster_hostname }}"; then
     IP=$(gcloud --project "{{ gce_project_id }}" compute addresses describe "{{ provision_prefix }}master-network-lb-ip" --region "{{ gce_region_name }}" --format='value(address)')
     if [[ ! -f $dns ]]; then
-        gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns start -z "{{ provision_prefix }}managed-zone"
+        gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns start -z "{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}"
     fi
-    gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns add -z "{{ provision_prefix }}managed-zone" --ttl 3600 --name "{{ openshift_master_cluster_hostname }}." --type A "$IP"
+    gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns add -z "{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}" --ttl 3600 --name "{{ openshift_master_cluster_hostname }}." --type A "$IP"
 else
     echo "DNS record for '{{ openshift_master_cluster_hostname }}' already exists"
 fi
 
 # DNS record for router lb
-if ! gcloud --project "{{ gce_project_id }}" dns record-sets list -z "{{ provision_prefix }}managed-zone" --name "{{ wildcard_zone }}" 2>/dev/null | grep -q "{{ wildcard_zone }}"; then
+if ! gcloud --project "{{ gce_project_id }}" dns record-sets list -z "{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}" --name "{{ wildcard_zone }}" 2>/dev/null | grep -q "{{ wildcard_zone }}"; then
     IP=$(gcloud --project "{{ gce_project_id }}" compute addresses describe "{{ provision_prefix }}router-network-lb-ip" --region "{{ gce_region_name }}" --format='value(address)')
     if [[ ! -f $dns ]]; then
-        gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns start -z "{{ provision_prefix }}managed-zone"
+        gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns start -z "{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}"
     fi
-    gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns add -z "{{ provision_prefix }}managed-zone" --ttl 3600 --name "{{ wildcard_zone }}." --type A "$IP"
-    gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns add -z "{{ provision_prefix }}managed-zone" --ttl 3600 --name "*.{{ wildcard_zone }}." --type CNAME "{{ wildcard_zone }}."
+    gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns add -z "{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}" --ttl 3600 --name "{{ wildcard_zone }}." --type A "$IP"
+    gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns add -z "{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}" --ttl 3600 --name "*.{{ wildcard_zone }}." --type CNAME "{{ wildcard_zone }}."
 else
     echo "DNS record for '{{ wildcard_zone }}' already exists"
 fi
 
 # Commit all DNS changes
 if [[ -f $dns ]]; then
-    gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns execute -z "{{ provision_prefix }}managed-zone"
+    gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns execute -z "{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}"
 fi
 
 # Create bucket for registry
