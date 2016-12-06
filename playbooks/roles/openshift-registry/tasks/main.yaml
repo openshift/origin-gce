@@ -47,9 +47,17 @@
   command: oc get secrets
   register: secrets
 
-- name: Create registry secrets
-  command: oc secrets new dockerregistry /root/config.yml {{ gcs_registry_keyfile }}
+- name: Place registry key onto host
+  copy:
+    src: "{{ gcs_registry_keyfile }}"
+    dest: /root/gcs-registry.json
+    mode: 0600
   when: "'dockerregistry' not in secrets.stdout"
+
+- name: Create registry secrets
+  command: oc secrets new dockerregistry /root/config.yml /root/gcs-registry.json
+  when: "'dockerregistry' not in secrets.stdout"
+
 
 - name: Determine if service account contains secrets
   command: oc describe serviceaccount/registry

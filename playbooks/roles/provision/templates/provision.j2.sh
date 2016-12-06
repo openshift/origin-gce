@@ -50,11 +50,13 @@ fi
 
 ### PROVISION THE INFRASTRUCTURE ###
 
+dns_zone="{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}"
+
 # Check the DNS managed zone in Google Cloud DNS, create it if it doesn't exist and exit after printing NS servers
-if ! gcloud --project "{{ gce_project_id }}" dns managed-zones describe "{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}" &>/dev/null; then
-    echo "DNS zone '{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}' doesn't exist. Please configure the following NS servers for your domain in your domain provider before proceeding with the installation:"
-    gcloud --project "{{ gce_project_id }}" dns managed-zones create "{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}" --dns-name "{{ public_hosted_zone }}" --description "{{ public_hosted_zone }} domain"
-    gcloud --project "{{ gce_project_id }}" dns managed-zones describe "{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}" --format='value(nameServers)' | tr ';' '\n'
+if ! gcloud --project "{{ gce_project_id }}" dns managed-zones describe "${dns_zone}" &>/dev/null; then
+    echo "DNS zone '${dns_zone}' doesn't exist. Please configure the following NS servers for your domain in your domain provider before proceeding with the installation:"
+    gcloud --project "{{ gce_project_id }}" dns managed-zones create "${dns_zone}" --dns-name "{{ public_hosted_zone }}" --description "{{ public_hosted_zone }} domain"
+    gcloud --project "{{ gce_project_id }}" dns managed-zones describe "${dns_zone}" --format='value(nameServers)' | tr ';' '\n'
 fi
 
 # Create network
@@ -80,10 +82,10 @@ declare -A FW_RULES=(
 
 # Create firewall rules
 for rule in "${!FW_RULES[@]}"; do
-    ( if ! gcloud --project "{{ gce_project_id }}" compute firewall-rules describe "$rule" &>/dev/null; then
-        gcloud --project "{{ gce_project_id }}" compute firewall-rules create "$rule" --network "{{ provision_prefix }}ocp-network" ${FW_RULES[$rule]}
+    ( if ! gcloud --project "{{ gce_project_id }}" compute firewall-rules describe "{{ provision_prefix }}$rule" &>/dev/null; then
+        gcloud --project "{{ gce_project_id }}" compute firewall-rules create "{{ provision_prefix }}$rule" --network "{{ provision_prefix }}ocp-network" ${FW_RULES[$rule]}
     else
-        echo "Firewall rule '${rule}' already exists"
+        echo "Firewall rule '{{ provision_prefix }}${rule}' already exists"
     fi ) &
 done
 
@@ -253,7 +255,6 @@ fi
 # Internal master target pool
 if ! gcloud --project "{{ gce_project_id }}" compute target-pools describe "{{ provision_prefix }}master-network-lb-pool" --region "{{ gce_region_name }}" &>/dev/null; then
     gcloud --project "{{ gce_project_id }}" compute target-pools create "{{ provision_prefix }}master-network-lb-pool" --http-health-check "{{ provision_prefix }}master-network-lb-health-check" --region "{{ gce_region_name }}"
-    gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed set-target-pools "{{ provision_prefix }}ig-m" --target-pools "{{ provision_prefix }}master-network-lb-pool" --zone "{{ gce_zone_name }}"
 else
     echo "Target pool '{{ provision_prefix }}master-network-lb-pool' already exists"
 fi
@@ -278,7 +279,6 @@ fi
 # Router target pool
 if ! gcloud --project "{{ gce_project_id }}" compute target-pools describe "{{ provision_prefix }}router-network-lb-pool" --region "{{ gce_region_name }}" &>/dev/null; then
     gcloud --project "{{ gce_project_id }}" compute target-pools create "{{ provision_prefix }}router-network-lb-pool" --http-health-check "{{ provision_prefix }}router-network-lb-health-check" --region "{{ gce_region_name }}"
-    gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed set-target-pools "{{ provision_prefix }}{{ provision_gce_router_network_instance_group }}" --target-pools "{{ provision_prefix }}router-network-lb-pool" --zone "{{ gce_zone_name }}"
 else
     echo "Target pool '{{ provision_prefix }}router-network-lb-pool' already exists"
 fi
@@ -294,46 +294,55 @@ fi
 
 for i in `jobs -p`; do wait $i; done
 
+# set the target pools
+if [[ "ig-m" == "{{ provision_gce_router_network_instance_group }}" ]]; then
+    gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed set-target-pools "{{ provision_prefix }}ig-m" --target-pools "{{ provision_prefix }}master-network-lb-pool,{{ provision_prefix }}router-network-lb-pool" --zone "{{ gce_zone_name }}"
+else
+    gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed set-target-pools "{{ provision_prefix }}ig-m" --target-pools "{{ provision_prefix }}master-network-lb-pool" --zone "{{ gce_zone_name }}"
+    gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed set-target-pools "{{ provision_prefix }}{{ provision_gce_router_network_instance_group }}" --target-pools "{{ provision_prefix }}router-network-lb-pool" --zone "{{ gce_zone_name }}"
+fi
+
+
 # DNS record for master lb
 dns="${TMPDIR:-/tmp}/dns.yaml"
 rm -f $dns
 
-if ! gcloud --project "{{ gce_project_id }}" dns record-sets list -z "{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}" --name "{{ openshift_master_cluster_public_hostname }}" 2>/dev/null | grep -q "{{ openshift_master_cluster_public_hostname }}"; then
+if ! gcloud --project "{{ gce_project_id }}" dns record-sets list -z "${dns_zone}" --name "{{ openshift_master_cluster_public_hostname }}" 2>/dev/null | grep -q "{{ openshift_master_cluster_public_hostname }}"; then
     IP=$(gcloud --project "{{ gce_project_id }}" compute addresses describe "{{ provision_prefix }}master-ssl-lb-ip" --global --format='value(address)')
     if [[ ! -f $dns ]]; then
-        gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns start -z "{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}"
+        gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns start -z "${dns_zone}"
     fi
-    gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns add -z "{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}" --ttl 3600 --name "{{ openshift_master_cluster_public_hostname }}." --type A "$IP"
+    gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns add -z "${dns_zone}" --ttl 3600 --name "{{ openshift_master_cluster_public_hostname }}." --type A "$IP"
 else
     echo "DNS record for '{{ openshift_master_cluster_public_hostname }}' already exists"
 fi
 
 # DNS record for internal master lb
-if ! gcloud --project "{{ gce_project_id }}" dns record-sets list -z "{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}" --name "{{ openshift_master_cluster_hostname }}" 2>/dev/null | grep -q "{{ openshift_master_cluster_hostname }}"; then
+if ! gcloud --project "{{ gce_project_id }}" dns record-sets list -z "${dns_zone}" --name "{{ openshift_master_cluster_hostname }}" 2>/dev/null | grep -q "{{ openshift_master_cluster_hostname }}"; then
     IP=$(gcloud --project "{{ gce_project_id }}" compute addresses describe "{{ provision_prefix }}master-network-lb-ip" --region "{{ gce_region_name }}" --format='value(address)')
     if [[ ! -f $dns ]]; then
-        gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns start -z "{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}"
+        gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns start -z "${dns_zone}"
     fi
-    gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns add -z "{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}" --ttl 3600 --name "{{ openshift_master_cluster_hostname }}." --type A "$IP"
+    gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns add -z "${dns_zone}" --ttl 3600 --name "{{ openshift_master_cluster_hostname }}." --type A "$IP"
 else
     echo "DNS record for '{{ openshift_master_cluster_hostname }}' already exists"
 fi
 
 # DNS record for router lb
-if ! gcloud --project "{{ gce_project_id }}" dns record-sets list -z "{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}" --name "{{ wildcard_zone }}" 2>/dev/null | grep -q "{{ wildcard_zone }}"; then
+if ! gcloud --project "{{ gce_project_id }}" dns record-sets list -z "${dns_zone}" --name "{{ wildcard_zone }}" 2>/dev/null | grep -q "{{ wildcard_zone }}"; then
     IP=$(gcloud --project "{{ gce_project_id }}" compute addresses describe "{{ provision_prefix }}router-network-lb-ip" --region "{{ gce_region_name }}" --format='value(address)')
     if [[ ! -f $dns ]]; then
-        gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns start -z "{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}"
+        gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns start -z "${dns_zone}"
     fi
-    gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns add -z "{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}" --ttl 3600 --name "{{ wildcard_zone }}." --type A "$IP"
-    gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns add -z "{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}" --ttl 3600 --name "*.{{ wildcard_zone }}." --type CNAME "{{ wildcard_zone }}."
+    gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns add -z "${dns_zone}" --ttl 3600 --name "{{ wildcard_zone }}." --type A "$IP"
+    gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns add -z "${dns_zone}" --ttl 3600 --name "*.{{ wildcard_zone }}." --type CNAME "{{ wildcard_zone }}."
 else
     echo "DNS record for '{{ wildcard_zone }}' already exists"
 fi
 
 # Commit all DNS changes
 if [[ -f $dns ]]; then
-    gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns execute -z "{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}"
+    gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns execute -z "${dns_zone}"
 fi
 
 # Create bucket for registry
