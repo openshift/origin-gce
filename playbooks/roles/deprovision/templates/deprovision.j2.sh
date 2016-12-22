@@ -29,48 +29,27 @@ function teardown() {
 }
 
 # DNS
-if gcloud --project "{{ gce_project_id }}" dns managed-zones describe "{{ provision_prefix }}managed-zone" &>/dev/null; then
+dns_zone="{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}"
+if gcloud --project "{{ gce_project_id }}" dns managed-zones describe "${dns_zone}" &>/dev/null; then
     dns="${TMPDIR:-/tmp}/dns.yaml"
-    rm -f $dns
-    dns_zone="{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}"
+    rm -f "${dns}"
 
-    if gcloud --project "{{ gce_project_id }}" dns record-sets list -z "${dns_zone}" --name "{{ openshift_master_cluster_public_hostname }}" 2>/dev/null | grep -q "{{ openshift_master_cluster_public_hostname }}"; then
-        IP=$(gcloud --project "{{ gce_project_id }}" compute addresses describe "{{ provision_prefix }}master-ssl-lb-ip" --global --format='value(address)')
-        if [[ ! -f $dns ]]; then
-            gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns start -z "${dns_zone}"
-        fi
-        gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns remove -z "${dns_zone}" --ttl 3600 --name "{{ openshift_master_cluster_public_hostname }}." --type A "$IP"
-    fi
+    # export all dns records that match into a zone format, and turn each line into a set of args for
+    # record-sets transaction.
+    gcloud dns record-sets export --project "{{ gce_project_id }}" -z origin-ci-int-gce --zone-file-format "${dns}"
+    grep -F -e '{{ openshift_master_cluster_hostname }}' \
+            -e '{{ openshift_master_cluster_public_hostname }}' \
+            -e '{{ wildcard_zone }}' \
+            "${dns}" | \
+            awk '{ print "--name", $1, "--ttl", $2, "--type", $4, $5; }' > "${dns}.input"
 
-    # DNS record for internal master lb
-    if gcloud --project "{{ gce_project_id }}" dns record-sets list -z "${dns_zone}" --name "{{ openshift_master_cluster_hostname }}" 2>/dev/null | grep -q "{{ openshift_master_cluster_hostname }}"; then
-        IP=$(gcloud --project "{{ gce_project_id }}" compute addresses describe "{{ provision_prefix }}master-network-lb-ip" --region "{{ gce_region_name }}" --format='value(address)')
-        if [[ ! -f $dns ]]; then
-            gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns start -z "${dns_zone}"
-        fi
-        gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns remove -z "${dns_zone}" --ttl 3600 --name "{{ openshift_master_cluster_hostname }}." --type A "$IP"
-    fi
-
-    # DNS record for router lb
-    if gcloud --project "{{ gce_project_id }}" dns record-sets list -z "${dns_zone}" --name "{{ wildcard_zone }}" 2>/dev/null | grep -q "{{ wildcard_zone }}"; then
-        IP=$(gcloud --project "{{ gce_project_id }}" compute addresses describe "{{ provision_prefix }}router-network-lb-ip" --region "{{ gce_region_name }}" --format='value(address)')
-        if [[ ! -f $dns ]]; then
-            gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns start -z "${dns_zone}"
-        fi
-        gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns remove -z "${dns_zone}" --ttl 3600 --name "{{ wildcard_zone }}." --type A "$IP"
-        gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns remove -z "${dns_zone}" --ttl 3600 --name "*.{{ wildcard_zone }}." --type CNAME "{{ wildcard_zone }}."
-    fi
-
-    # Commit all DNS changes
-    if [[ -f $dns ]]; then
+    if [[ "$( cat "${dns}.input" | wc -l )" -ne 0 ]]; then
+        rm -f "${dns}"
+        gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns start -z "${dns_zone}"
+        cat "${dns}.input" | xargs -L1 gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file="${dns}" remove -z "${dns_zone}"
         gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns execute -z "${dns_zone}"
+        rm "${dns}.input"
     fi
-
-    # Easy way how to delete all records from a zone is to import empty file and specify '--delete-all-existing'
-    # EMPTY_FILE="${TMPDIR:-/tmp}/ocp-dns-records-empty.yml"
-    # touch "$EMPTY_FILE"
-    # gcloud --project "{{ gce_project_id }}" dns record-sets import "$EMPTY_FILE" -z "{{ provision_prefix }}managed-zone" --delete-all-existing &>/dev/null
-    # rm -f "$EMPTY_FILE"
 fi
 
 (
