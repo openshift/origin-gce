@@ -44,6 +44,7 @@ RUN mkdir -p $CONTEXT_DIR/{bin,data,instance-data} && \
     yum install -y $INSTALL_PKGS && \
     rpm -V $INSTALL_PKGS && \
     yum clean all && \
+    ln -s $CONTEXT_DIR/gce-ansible/run.sh /usr/bin/ansible-gce && \
     mkdir -p /usr/share/ansible && \
     cd /usr/share/ansible && \
     git clone https://github.com/openshift/openshift-ansible.git && \
@@ -55,8 +56,8 @@ RUN mkdir -p $CONTEXT_DIR/{bin,data,instance-data} && \
     ./google-cloud-sdk/bin/gcloud -q components install beta && \
     ./google-cloud-sdk/install.sh -q --usage-reporting false
 
-WORKDIR /usr/local/install/data
+WORKDIR /usr/local/install/gce-ansible
 ENTRYPOINT ["/usr/local/install/gce-ansible/entrypoint.sh"]
-CMD ["/usr/local/install/gce-ansible/run.sh"]
+CMD ["ansible-gce", "playbooks/provision.yaml"]
 
 ADD . $CONTEXT_DIR/gce-ansible
