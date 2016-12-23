@@ -37,13 +37,9 @@ if gcloud --project "{{ gce_project_id }}" dns managed-zones describe "${dns_zon
     # export all dns records that match into a zone format, and turn each line into a set of args for
     # record-sets transaction.
     gcloud dns record-sets export --project "{{ gce_project_id }}" -z origin-ci-int-gce --zone-file-format "${dns}"
-    grep -F -e '{{ openshift_master_cluster_hostname }}' \
-            -e '{{ openshift_master_cluster_public_hostname }}' \
-            -e '{{ wildcard_zone }}' \
-            "${dns}" | \
+    if grep -F -e '{{ openshift_master_cluster_hostname }}' -e '{{ openshift_master_cluster_public_hostname }}' -e '{{ wildcard_zone }}' "${dns}" | \
             awk '{ print "--name", $1, "--ttl", $2, "--type", $4, $5; }' > "${dns}.input"
-
-    if [[ "$( cat "${dns}.input" | wc -l )" -ne 0 ]]; then
+    then
         rm -f "${dns}"
         gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns start -z "${dns_zone}"
         cat "${dns}.input" | xargs -L1 gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file="${dns}" remove -z "${dns_zone}"

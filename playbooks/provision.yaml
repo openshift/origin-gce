@@ -6,4 +6,6 @@
   roles:
     - provision
 
+- meta: refresh_inventory
+
 - include: install.yaml
