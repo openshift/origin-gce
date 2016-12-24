@@ -1,9 +1,13 @@
 ---
+- name: refresh yum cache
+  command: yum clean all
+  when: ansible_os_family == "RedHat"
+
 - name: install haproxy
   package: name=haproxy state=present
   register: result
   until: '"failed" not in result'
-  retries: 5
+  retries: 10
   delay: 10
 
 - name: configure haproxy

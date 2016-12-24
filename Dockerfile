@@ -44,20 +44,21 @@ RUN mkdir -p $CONTEXT_DIR/{bin,data,instance-data} && \
     yum install -y $INSTALL_PKGS && \
     rpm -V $INSTALL_PKGS && \
     yum clean all && \
-    ln -s $CONTEXT_DIR/gce-ansible/run.sh /usr/bin/ansible-gce && \
+    ln -s /usr/share/ansible/openshift-ansible-gce/run.sh /usr/bin/ansible-gce && \
     mkdir -p /usr/share/ansible && \
     cd /usr/share/ansible && \
     git clone https://github.com/openshift/openshift-ansible.git && \
     cd openshift-ansible && \
     git checkout ${OPENSHIFT_ANSIBLE_TAG} && \
+    mkdir -p /usr/share/ansible/openshift-ansible-gce && \
     cd $CONTEXT_DIR && \
     curl -sSL https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-${GOOGLE_CLOUD_SDK_VERSION}-linux-x86_64.tar.gz | tar -xzvf - && \
     ./google-cloud-sdk/bin/gcloud -q components update && \
     ./google-cloud-sdk/bin/gcloud -q components install beta && \
     ./google-cloud-sdk/install.sh -q --usage-reporting false
 
-WORKDIR /usr/local/install/gce-ansible
-ENTRYPOINT ["/usr/local/install/gce-ansible/entrypoint.sh"]
+WORKDIR /usr/share/ansible/openshift-ansible-gce
+ENTRYPOINT ["/usr/share/ansible/openshift-ansible-gce/entrypoint.sh"]
 CMD ["ansible-gce", "playbooks/provision.yaml"]
 
-ADD . $CONTEXT_DIR/gce-ansible
+ADD . /usr/share/ansible/openshift-ansible-gce
