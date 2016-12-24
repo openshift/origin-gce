@@ -32,6 +32,15 @@
 
 - include: setup.yaml
 
+- hosts: primary_master
+  gather_facts: no
+  tasks:
+    - name: Retrieve cluster configuration
+      fetch:
+        src: "{{ openshift.common.config_base }}/master/admin.kubeconfig"
+        dest: "{{ install_var | dirname }}/"
+        flat: yes
+
 - hosts: infra_nodes
   gather_facts: no
   roles:

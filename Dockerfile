@@ -29,7 +29,7 @@ LABEL io.k8s.display-name="OpenShift GCE Install Environment" \
 ENV CONTEXT_DIR=/usr/local/install \
     HOME=/usr/local/install/data \
     GOOGLE_CLOUD_SDK_VERSION=130.0.0 \
-    OPENSHIFT_ANSIBLE_TAG=release-1.3 \
+    OPENSHIFT_ANSIBLE_TAG=release-1.4 \
     GCE_PEM_FILE_PATH=/usr/local/install/data/gce.pem \
     CONFIG_SCRIPT=/usr/local/install/data/config.sh
 
