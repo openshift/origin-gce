@@ -1,6 +1,10 @@
 ---
 - name: install haproxy
   package: name=haproxy state=present
+  register: result
+  until: '"failed" not in result'
+  retries: 5
+  delay: 10
 
 - name: configure haproxy
   template: src=haproxy.cfg.j2 dest=/etc/haproxy/haproxy.cfg
