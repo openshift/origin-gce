@@ -39,7 +39,6 @@ RUN mkdir -p $CONTEXT_DIR/{bin,data,instance-data} && \
     chmod uga+rwx -R $CONTEXT_DIR /home/cloud-user && \
     ln -s $CONTEXT_DIR/data/ssh-privatekey /home/cloud-user/.ssh/google_compute_engine && \
     ln -s $CONTEXT_DIR/data/ssh-publickey /home/cloud-user/.ssh/google_compute_engine.pub && \
-    curl -L https://copr.fedorainfracloud.org/coprs/abutcher/ansible/repo/epel-7/abutcher-ansible-epel-7.repo > /etc/yum.repos.d/abutcher-ansible-epel-7.repo && \
     INSTALL_PKGS="python-libcloud pyOpenSSL ansible openssl gettext" && \
     yum install -y $INSTALL_PKGS && \
     rpm -V $INSTALL_PKGS && \

@@ -60,30 +60,34 @@ if ! gcloud --project "{{ gce_project_id }}" dns managed-zones describe "${dns_z
 fi
 
 # Create network
-if ! gcloud --project "{{ gce_project_id }}" compute networks describe "{{ provision_prefix }}ocp-network" &>/dev/null; then
-    gcloud --project "{{ gce_project_id }}" compute networks create "{{ provision_prefix }}ocp-network" --mode "auto"
+if ! gcloud --project "{{ gce_project_id }}" compute networks describe "{{ gce_network_name }}" &>/dev/null; then
+    gcloud --project "{{ gce_project_id }}" compute networks create "{{ gce_network_name }}" --mode "auto"
 else
-    echo "Network '{{ provision_prefix }}ocp-network' already exists"
+    echo "Network '{{ gce_network_name }}' already exists"
 fi
 
 # Firewall rules in a form:
 # ['name']='parameters for "gcloud compute firewall-rules create"'
 # For all possible parameters see: gcloud compute firewall-rules create --help
+range=""
+if [[ -n "{{ openshift_node_port_range }}" ]]; then
+    range=",tcp:{{ openshift_node_port_range }},udp:{{ openshift_node_port_range }}"
+fi
 declare -A FW_RULES=(
   ['icmp']='--allow icmp'
   ['ssh-external']='--allow tcp:22'
   ['ssh-internal']='--allow tcp:22 --source-tags bastion'
   ['master-internal']="--allow tcp:2224,tcp:2379,tcp:2380,tcp:4001,udp:4789,udp:5404,udp:5405,tcp:8053,udp:8053,tcp:8444,tcp:10250,tcp:10255,udp:10255,tcp:24224,udp:24224 --source-tags ocp --target-tags ocp-master"
-  ['master-external']="--allow tcp:80,tcp:443,tcp:1936,tcp:8080,tcp:8443 --target-tags ocp-master"
+  ['master-external']="--allow tcp:80,tcp:443,tcp:1936,tcp:8080,tcp:8443${range} --target-tags ocp-master"
   ['node-internal']="--allow udp:4789,tcp:10250,tcp:10255,udp:10255 --source-tags ocp --target-tags ocp-node,ocp-infra-node"
   ['infra-node-internal']="--allow tcp:5000 --source-tags ocp --target-tags ocp-infra-node"
-  ['infra-node-external']="--allow tcp:80,tcp:443,tcp:1936 --target-tags ocp-infra-node"
+  ['infra-node-external']="--allow tcp:80,tcp:443,tcp:1936${range} --target-tags ocp-infra-node"
 )
 
 # Create firewall rules
 for rule in "${!FW_RULES[@]}"; do
     ( if ! gcloud --project "{{ gce_project_id }}" compute firewall-rules describe "{{ provision_prefix }}$rule" &>/dev/null; then
-        gcloud --project "{{ gce_project_id }}" compute firewall-rules create "{{ provision_prefix }}$rule" --network "{{ provision_prefix }}ocp-network" ${FW_RULES[$rule]}
+        gcloud --project "{{ gce_project_id }}" compute firewall-rules create "{{ provision_prefix }}$rule" --network "{{ gce_network_name }}" ${FW_RULES[$rule]}
     else
         echo "Firewall rule '{{ provision_prefix }}${rule}' already exists"
     fi ) &
@@ -116,7 +120,7 @@ for i in `jobs -p`; do wait $i; done
 # Create instance templates
 (
 if ! gcloud --project "{{ gce_project_id }}" compute instance-templates describe "{{ provision_prefix }}instance-template-master" &>/dev/null; then
-    gcloud --project "{{ gce_project_id }}" compute instance-templates create "{{ provision_prefix }}instance-template-master" --machine-type "{{ provision_gce_machine_type_master }}" --network "{{ provision_prefix }}ocp-network" --tags "{{ provision_prefix }}ocp,ocp,ocp-master{{ gce_extra_tags_master }}" --image "{{ provision_gce_registered_image }}" --boot-disk-size "35" --boot-disk-type "pd-ssd" --scopes logging-write,monitoring-write,useraccounts-ro,service-control,service-management,storage-ro,compute-rw ${metadata}
+    gcloud --project "{{ gce_project_id }}" compute instance-templates create "{{ provision_prefix }}instance-template-master" --machine-type "{{ provision_gce_machine_type_master }}" --network "{{ gce_network_name }}" --tags "{{ provision_prefix }}ocp,ocp,ocp-master{{ gce_extra_tags_master }}" --image "{{ provision_gce_registered_image }}" --boot-disk-size "35" --boot-disk-type "pd-ssd" --scopes logging-write,monitoring-write,useraccounts-ro,service-control,service-management,storage-ro,compute-rw ${metadata}
 else
     echo "Instance template '{{ provision_prefix }}instance-template-master' already exists"
 fi
@@ -132,7 +136,7 @@ fi
 
 (
 if ! gcloud --project "{{ gce_project_id }}" compute instance-templates describe "{{ provision_prefix }}instance-template-node" &>/dev/null; then
-    gcloud --project "{{ gce_project_id }}" compute instance-templates create "{{ provision_prefix }}instance-template-node" --machine-type "{{ provision_gce_machine_type_node }}" --network "{{ provision_prefix }}ocp-network" --tags "{{ provision_prefix }}ocp,ocp,ocp-node{{ gce_extra_tags_node }}" --image "{{ provision_gce_registered_image }}" --boot-disk-size "25" --boot-disk-type "pd-ssd" --scopes logging-write,monitoring-write,useraccounts-ro,service-control,service-management,storage-ro,compute-rw ${metadata}
+    gcloud --project "{{ gce_project_id }}" compute instance-templates create "{{ provision_prefix }}instance-template-node" --machine-type "{{ provision_gce_machine_type_node }}" --network "{{ gce_network_name }}" --tags "{{ provision_prefix }}ocp,ocp,ocp-node{{ gce_extra_tags_node }}" --image "{{ provision_gce_registered_image }}" --boot-disk-size "25" --boot-disk-type "pd-ssd" --scopes logging-write,monitoring-write,useraccounts-ro,service-control,service-management,storage-ro,compute-rw ${metadata}
 else
     echo "Instance template '{{ provision_prefix }}instance-template-node' already exists"
 fi
@@ -147,7 +151,7 @@ fi
 
 (
 if ! gcloud --project "{{ gce_project_id }}" compute instance-templates describe "{{ provision_prefix }}instance-template-node-infra" &>/dev/null; then
-    gcloud --project "{{ gce_project_id }}" compute instance-templates create "{{ provision_prefix }}instance-template-node-infra" --machine-type "{{ provision_gce_machine_type_node_infra }}" --network "{{ provision_prefix }}ocp-network" --tags "{{ provision_prefix }}ocp,ocp,ocp-infra-node{{ gce_extra_tags_node_infra }}" --image "{{ provision_gce_registered_image }}" --boot-disk-size "25" --boot-disk-type "pd-ssd" --scopes logging-write,monitoring-write,useraccounts-ro,service-control,service-management,storage-rw,compute-rw ${metadata}
+    gcloud --project "{{ gce_project_id }}" compute instance-templates create "{{ provision_prefix }}instance-template-node-infra" --machine-type "{{ provision_gce_machine_type_node_infra }}" --network "{{ gce_network_name }}" --tags "{{ provision_prefix }}ocp,ocp,ocp-infra-node{{ gce_extra_tags_node_infra }}" --image "{{ provision_gce_registered_image }}" --boot-disk-size "25" --boot-disk-type "pd-ssd" --scopes logging-write,monitoring-write,useraccounts-ro,service-control,service-management,storage-rw,compute-rw ${metadata}
 else
     echo "Instance template '{{ provision_prefix }}instance-template-node-infra' already exists"
 fi

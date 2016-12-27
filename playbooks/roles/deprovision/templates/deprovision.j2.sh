@@ -102,9 +102,9 @@ done
 for i in `jobs -p`; do wait $i; done
 
 # Instance groups
-teardown "{{ provision_prefix }}ig-m" beta compute instance-groups managed --zone "{{ gce_zone_name }}"
-teardown "{{ provision_prefix }}ig-n" beta compute instance-groups managed --zone "{{ gce_zone_name }}"
-teardown "{{ provision_prefix }}ig-i" beta compute instance-groups managed --zone "{{ gce_zone_name }}"
+( teardown "{{ provision_prefix }}ig-m" beta compute instance-groups managed --zone "{{ gce_zone_name }}" ) &
+( teardown "{{ provision_prefix }}ig-n" beta compute instance-groups managed --zone "{{ gce_zone_name }}" ) &
+( teardown "{{ provision_prefix }}ig-i" beta compute instance-groups managed --zone "{{ gce_zone_name }}" ) &
 
 for i in `jobs -p`; do wait $i; done
 
@@ -135,4 +135,4 @@ done
 for i in `jobs -p`; do wait $i; done
 
 # Network
-teardown "{{ provision_prefix }}ocp-network" compute networks
+teardown "{{ gce_network_name }}" compute networks
