@@ -1,12 +1,12 @@
-- include: "{{ install_var }}"
-
 - hosts: localhost
   connection: local
   gather_facts: no
   roles:
     - provision
+    - dynamic-inventory
 
 - hosts: localhost
+  become: no
   tasks:
   - meta: refresh_inventory
 

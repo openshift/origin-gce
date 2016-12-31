@@ -26,38 +26,39 @@ FROM openshift/origin-base
 LABEL io.k8s.display-name="OpenShift GCE Install Environment" \
       io.k8s.description="This image helps install OpenShift onto GCE."
 
-ENV CONTEXT_DIR=/usr/local/install \
-    HOME=/usr/local/install/data \
+ENV WORK=/usr/share/ansible/openshift-ansible-gce \
+    HOME=/home/cloud-user \
     GOOGLE_CLOUD_SDK_VERSION=130.0.0 \
-    OPENSHIFT_ANSIBLE_TAG=release-1.4 \
-    GCE_PEM_FILE_PATH=/usr/local/install/data/gce.pem \
-    CONFIG_SCRIPT=/usr/local/install/data/config.sh
+    OPENSHIFT_ANSIBLE_TAG=release-1.4
+
+# meta refresh_inventory has a bug in 2.2.0 where it uses relative path
+# remove when fixed
+ENV ANSIBLE_INVENTORY=$WORK/inventory.sh
 
 # package atomic-openshift-utils missing
-RUN mkdir -p $CONTEXT_DIR/{bin,data,instance-data} && \
-    mkdir -p /home/cloud-user/.ssh && \
-    chmod uga+rwx -R $CONTEXT_DIR /home/cloud-user && \
-    ln -s $CONTEXT_DIR/data/ssh-privatekey /home/cloud-user/.ssh/google_compute_engine && \
-    ln -s $CONTEXT_DIR/data/ssh-publickey /home/cloud-user/.ssh/google_compute_engine.pub && \
-    INSTALL_PKGS="python-libcloud pyOpenSSL ansible openssl gettext" && \
+RUN mkdir -p /usr/share/ansible $HOME/.ssh && \
+    ln -s $WORK/playbooks/files/ssh-privatekey $HOME/.ssh/google_compute_engine && \
+    ln -s $WORK/playbooks/files/ssh-publickey $HOME/.ssh/google_compute_engine.pub && \
+    INSTALL_PKGS="python-libcloud pyOpenSSL ansible openssl gettext sudo" && \
     yum install -y $INSTALL_PKGS && \
     rpm -V $INSTALL_PKGS && \
     yum clean all && \
-    ln -s /usr/share/ansible/openshift-ansible-gce/run.sh /usr/bin/ansible-gce && \
-    mkdir -p /usr/share/ansible && \
     cd /usr/share/ansible && \
     git clone https://github.com/openshift/openshift-ansible.git && \
     cd openshift-ansible && \
     git checkout ${OPENSHIFT_ANSIBLE_TAG} && \
-    mkdir -p /usr/share/ansible/openshift-ansible-gce && \
-    cd $CONTEXT_DIR && \
+    mkdir -p $WORK && \
+    cd $HOME && \
     curl -sSL https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-${GOOGLE_CLOUD_SDK_VERSION}-linux-x86_64.tar.gz | tar -xzvf - && \
     ./google-cloud-sdk/bin/gcloud -q components update && \
     ./google-cloud-sdk/bin/gcloud -q components install beta && \
-    ./google-cloud-sdk/install.sh -q --usage-reporting false
+    ./google-cloud-sdk/install.sh -q --usage-reporting false && \
+    echo 'ALL ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers && \
+    chmod -R g+w /usr/share/ansible $HOME /etc/passwd
 
-WORKDIR /usr/share/ansible/openshift-ansible-gce
+WORKDIR $WORK
 ENTRYPOINT ["/usr/share/ansible/openshift-ansible-gce/entrypoint.sh"]
-CMD ["ansible-gce", "playbooks/provision.yaml"]
+CMD ["ansible-playbook", "playbooks/provision.yaml"]
+USER 1000
 
-ADD . /usr/share/ansible/openshift-ansible-gce
+COPY . $WORK

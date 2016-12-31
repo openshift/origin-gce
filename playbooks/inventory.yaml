@@ -2,4 +2,4 @@
   connection: local
   gather_facts: no
   roles:
-    - deprovision
+    - dynamic-inventory

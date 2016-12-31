@@ -49,7 +49,7 @@
 
 - name: Place registry key onto host
   copy:
-    src: "{{ gcs_registry_keyfile }}"
+    contents: "{{ gcs_registry_keyfile }}"
     dest: /root/gcs-registry.json
     mode: 0600
   when: "'dockerregistry' not in secrets.stdout"
