@@ -250,10 +250,15 @@ class GceInventory(object):
                            help='List instances (default: True)')
         parser.add_argument('--host', action='store',
                            help='Get all information about an instance')
+        parser.add_argument('--tagged', action='store',
+                           help='Only include instances with this tag')
         parser.add_argument('--pretty', action='store_true', default=False,
                            help='Pretty format (default: False)')
         self.args = parser.parse_args()
 
+        tag_env = os.environ.get('GCE_TAGGED_INSTANCES')
+        if not self.args.tagged and tag_env:
+            self.args.tagged = tag_env
 
     def node_to_dict(self, inst):
         md = {}
@@ -316,6 +321,9 @@ class GceInventory(object):
                 continue
 
             name = node.name
+
+            if self.args.tagged and self.args.tagged not in node.extra['tags']:
+                continue
 
             meta["hostvars"][name] = self.node_to_dict(node)
 

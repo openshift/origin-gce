@@ -7,7 +7,6 @@
       role: infra
       subrole: master
   with_items: "{{ groups['tag_ocp-master'] }}"
-  when: hostvars[item].gce_name | match( '^' + provision_prefix )
 
 - name: Add a master to the primary masters group
   add_host:
@@ -17,7 +16,6 @@
       role: infra
       subrole: master
   with_items: "{{ groups['tag_ocp-master'].0 }}"
-  when: hostvars[item].gce_name | match( '^' + provision_prefix )
 
 - name: Add infra instances to host group
   add_host:
@@ -27,7 +25,6 @@
       role: infra
       subrole: worker
   with_items: "{{ groups['tag_ocp-infra-node'] | default([]) }}"
-  when: hostvars[item].gce_name | match( '^' + provision_prefix )
 
 - name: Add app instances to host group
   add_host:
@@ -36,4 +33,3 @@
     openshift_node_labels:
       role: app
   with_items: "{{ groups['tag_ocp-node'] | default([])  }}"
-  when: hostvars[item].gce_name | match( '^' + provision_prefix )
