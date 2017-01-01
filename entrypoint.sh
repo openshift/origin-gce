@@ -27,6 +27,7 @@ if ! whoami &>/dev/null; then
   if key=$( cat "${keyfile}" ); then
     rm -f "${keyfile}"
     echo "${key}" > "${keyfile}"
+    chmod 0600 "${keyfile}"
   fi
 fi
 

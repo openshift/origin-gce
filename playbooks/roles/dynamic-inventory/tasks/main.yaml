@@ -1,5 +1,5 @@
 ---
 - name: Extract PEM from service account file
-  copy: content="{{ gce_service_account_keyfile.private_key }}" dest=/tmp/gce.pem mode=0600
+  copy: content="{{ (lookup('file', playbook_dir + '/files/' + gce_service_account_keyfile ) | from_json ).private_key }}" dest=/tmp/gce.pem mode=0600
 - name: Templatize environment script
   template: src=inventory.j2.sh dest=/tmp/inventory.sh mode=u+rx

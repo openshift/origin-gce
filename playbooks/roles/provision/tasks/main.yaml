@@ -4,3 +4,5 @@
 
 - name: Provision GCE resources
   command: /tmp/provision.sh
+  args:
+    chdir: "{{ playbook_dir }}/files"
