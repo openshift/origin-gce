@@ -36,7 +36,7 @@ ENV WORK=/usr/share/ansible/openshift-ansible-gce \
 ENV ANSIBLE_INVENTORY=$WORK/inventory.sh
 
 # package atomic-openshift-utils missing
-RUN mkdir -p /usr/share/ansible $HOME/.ssh && \
+RUN mkdir -p /usr/share/ansible $HOME/.ssh $WORK/playbooks/files && \
     ln -s $WORK/playbooks/files/ssh-privatekey $HOME/.ssh/google_compute_engine && \
     ln -s $WORK/playbooks/files/ssh-publickey $HOME/.ssh/google_compute_engine.pub && \
     INSTALL_PKGS="python-libcloud pyOpenSSL ansible openssl gettext sudo" && \
@@ -47,7 +47,6 @@ RUN mkdir -p /usr/share/ansible $HOME/.ssh && \
     git clone https://github.com/openshift/openshift-ansible.git && \
     cd openshift-ansible && \
     git checkout ${OPENSHIFT_ANSIBLE_TAG} && \
-    mkdir -p $WORK && \
     cd $HOME && \
     curl -sSL https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-${GOOGLE_CLOUD_SDK_VERSION}-linux-x86_64.tar.gz | tar -xzvf - && \
     ./google-cloud-sdk/bin/gcloud -q components update && \

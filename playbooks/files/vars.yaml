@@ -1,8 +1,7 @@
 # These are the default variables across all playbooks. This directory should contain
-# all files referenced by the playbook when running in a docker container, and from
-# this file other files in the same directory can be referenced with:
-#
-#   "{{ lookup('file', '{{ playbook_dir }}/files/NAME') }}"
+# all files referenced by the playbook when running in a docker container. To reference
+# a file, use a relative path, assuming that 'playbooks/files' will be prepending to
+# your path.
 #
 # This ensures that a relatively standard layout is used both inside and outside
 # of a containerized image.
