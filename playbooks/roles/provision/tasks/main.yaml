@@ -15,7 +15,7 @@
   assert:
     that:
     - "lookup('dig', public_hosted_zone, 'qtype=NS') == dns_provision.stdout"
-    msg: "The DNS domain {{ public_hosted_zone }} defined in 'public_hosted_zone' must have NS records pointing to the Google nameservers: '{{ dns_provision.stdout }}'."
+    msg: "The DNS domain {{ public_hosted_zone }} defined in 'public_hosted_zone' must have NS records pointing to the Google nameservers: '{{ dns_provision.stdout }}' instead of '{{ lookup('dig', public_hosted_zone, 'qtype=NS') }}'."
 
 - name: Provision GCE resources
   command: /tmp/provision.sh
