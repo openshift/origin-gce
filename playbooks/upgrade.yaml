@@ -1,0 +1,16 @@
+- hosts: localhost
+  connection: local
+  roles:
+    - instance-groups
+
+- name: Ensure BYO playbook defaults are loaded, but with lower priority than group_vars
+  hosts: all
+  tasks:
+  - include_vars:
+      dir: defaults
+  - include_vars:
+      dir: group_vars/all
+
+# TODO: make this parameterizeable? That would make this a dynamic playbook, which has consequences for
+#   syntax checking.
+- include: /usr/share/ansible/openshift-ansible/playbooks/byo/openshift-cluster/upgrades/v3_4/upgrade.yml

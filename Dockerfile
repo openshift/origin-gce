@@ -39,7 +39,7 @@ ENV ANSIBLE_INVENTORY=$WORK/inventory.sh
 RUN mkdir -p /usr/share/ansible $HOME/.ssh $WORK/playbooks/files && \
     ln -s $WORK/playbooks/files/ssh-privatekey $HOME/.ssh/google_compute_engine && \
     ln -s $WORK/playbooks/files/ssh-publickey $HOME/.ssh/google_compute_engine.pub && \
-    INSTALL_PKGS="python-libcloud pyOpenSSL ansible openssl gettext sudo" && \
+    INSTALL_PKGS="python-dns python-libcloud pyOpenSSL ansible openssl gettext sudo" && \
     yum install -y $INSTALL_PKGS && \
     rpm -V $INSTALL_PKGS && \
     yum clean all && \
@@ -58,6 +58,7 @@ RUN mkdir -p /usr/share/ansible $HOME/.ssh $WORK/playbooks/files && \
 WORKDIR $WORK
 ENTRYPOINT ["/usr/share/ansible/openshift-ansible-gce/entrypoint.sh"]
 CMD ["ansible-playbook", "playbooks/provision.yaml"]
-USER 1000
 
 COPY . $WORK
+RUN chmod -R g+w $WORK
+USER 1000

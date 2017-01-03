@@ -1,6 +1,21 @@
 ---
+- name: Templatize DNS script
+  template: src=dns.j2.sh dest=/tmp/dns.sh mode=u+rx
+
 - name: Templatize provision script
   template: src=provision.j2.sh dest=/tmp/provision.sh mode=u+rx
+
+- name: Provision GCE DNS domain
+  command: /tmp/dns.sh
+  args:
+    chdir: "{{ playbook_dir }}/files"
+  register: dns_provision
+
+- name: Ensure that DNS resolves to the hosted zone
+  assert:
+    that:
+    - "lookup('dig', public_hosted_zone, 'qtype=NS') == dns_provision.stdout"
+    msg: "The DNS domain {{ public_hosted_zone }} defined in 'public_hosted_zone' must have NS records pointing to the Google nameservers: '{{ dns_provision.stdout }}'."
 
 - name: Provision GCE resources
   command: /tmp/provision.sh
