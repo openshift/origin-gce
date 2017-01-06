@@ -6,16 +6,13 @@
 - hosts: cluster_hosts
   roles:
     - docker-storage-setup
+    - gce-cloudconfig
+    - frequent-log-rotation
 
 - hosts: schedulable_nodes
   gather_facts: no
   roles:
     - openshift-volume-quota
-
-- hosts: cluster_hosts
-  gather_facts: no
-  roles:
-    - gce-cloudconfig
 
 - hosts: masters
   gather_facts: no
