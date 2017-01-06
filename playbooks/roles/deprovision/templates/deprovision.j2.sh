@@ -36,7 +36,7 @@ if gcloud --project "{{ gce_project_id }}" dns managed-zones describe "${dns_zon
 
     # export all dns records that match into a zone format, and turn each line into a set of args for
     # record-sets transaction.
-    gcloud dns record-sets export --project "{{ gce_project_id }}" -z origin-ci-int-gce --zone-file-format "${dns}"
+    gcloud dns record-sets export --project "{{ gce_project_id }}" -z "${dns_zone}" --zone-file-format "${dns}"
     if grep -F -e '{{ openshift_master_cluster_hostname }}' -e '{{ openshift_master_cluster_public_hostname }}' -e '{{ wildcard_zone }}' "${dns}" | \
             awk '{ print "--name", $1, "--ttl", $2, "--type", $4, $5; }' > "${dns}.input"
     then
