@@ -1,9 +1,0 @@
-- name: Ensure BYO playbook defaults are loaded, but with lower priority than group_vars
-  hosts: all
-  tasks:
-  - include_vars:
-      dir: defaults
-  - include_vars:
-      dir: group_vars/all
-
-- include: /usr/share/ansible/openshift-ansible/playbooks/byo/config.yml

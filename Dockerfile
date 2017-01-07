@@ -57,7 +57,7 @@ RUN mkdir -p /usr/share/ansible $HOME/.ssh $WORK/playbooks/files && \
 
 WORKDIR $WORK
 ENTRYPOINT ["/usr/share/ansible/openshift-ansible-gce/entrypoint.sh"]
-CMD ["ansible-playbook", "playbooks/provision.yaml"]
+CMD ["ansible-playbook", "playbooks/launch.yaml"]
 
 COPY . $WORK
 RUN chmod -R g+w $WORK

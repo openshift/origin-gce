@@ -1,3 +1,5 @@
+# This playbook converges the cluster to the desired state
+
 - hosts: localhost
   connection: local
   roles:
@@ -5,6 +7,8 @@
 
 - hosts: cluster_hosts
   roles:
+    - cluster-variables
+    - refresh-subscriptions
     - docker-storage-setup
     - gce-cloudconfig
     - frequent-log-rotation
@@ -17,13 +21,13 @@
 - hosts: masters
   gather_facts: no
   roles:
-    - role: master-http-proxy
+    - master-http-proxy
     - role: /usr/share/ansible/openshift-ansible/roles/os_firewall
       os_firewall_allow:
         - service: master http proxy
           port: 8080/tcp
 
-- include: setup.yaml
+- include: /usr/share/ansible/openshift-ansible/playbooks/byo/config.yml
 
 - hosts: primary_master
   gather_facts: no
@@ -58,4 +62,11 @@
     - openshift-registry
     - openshift-roles
 
-- include: validation.yaml
+- hosts: localhost
+  roles:
+    - validate-public
+
+- hosts: masters
+  gather_facts: no
+  roles:
+    - validate-masters

@@ -1,15 +1,13 @@
+# This playbook should converge a cluster to the desired major version, or perform incremental updates if no major version change is required
+
 - hosts: localhost
   connection: local
   roles:
     - instance-groups
 
-- name: Ensure BYO playbook defaults are loaded, but with lower priority than group_vars
-  hosts: all
-  tasks:
-  - include_vars:
-      dir: defaults
-  - include_vars:
-      dir: group_vars/all
+- hosts: cluster_hosts
+  roles:
+  - cluster-variables
 
 # TODO: make this parameterizeable? That would make this a dynamic playbook, which has consequences for
 #   syntax checking.

@@ -1,0 +1,9 @@
+- include_vars:
+    dir: "{{ playbook_dir }}/group_vars/all"
+    name: _cluster_variables
+- name: Set cluster variables as facts, for use in other playbooks
+  set_fact: {"{{ item.key }}": "{{ item.value }}"}
+  with_dict: "{{ _cluster_variables }}"
+  no_log: True
+- set_fact:
+    _cluster_variables: !!null
