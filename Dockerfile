@@ -29,7 +29,7 @@ LABEL io.k8s.display-name="OpenShift GCE Install Environment" \
 ENV WORK=/usr/share/ansible/openshift-ansible-gce \
     HOME=/home/cloud-user \
     GOOGLE_CLOUD_SDK_VERSION=130.0.0 \
-    OPENSHIFT_ANSIBLE_TAG=release-1.4
+    OPENSHIFT_ANSIBLE_TAG=master
 
 # meta refresh_inventory has a bug in 2.2.0 where it uses relative path
 # remove when fixed
