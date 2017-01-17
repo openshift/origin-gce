@@ -48,7 +48,7 @@ RUN mkdir -p /usr/share/ansible $HOME/.ssh $WORK/playbooks/files && \
     cd openshift-ansible && \
     git checkout ${OPENSHIFT_ANSIBLE_TAG} && \
     cd $HOME && \
-    curl -sSL https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-${GOOGLE_CLOUD_SDK_VERSION}-linux-x86_64.tar.gz | tar -xzvf - && \
+    curl -sSL https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-${GOOGLE_CLOUD_SDK_VERSION}-linux-x86_64.tar.gz | tar -xzf - && \
     ./google-cloud-sdk/bin/gcloud -q components update && \
     ./google-cloud-sdk/bin/gcloud -q components install beta && \
     ./google-cloud-sdk/install.sh -q --usage-reporting false && \
