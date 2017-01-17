@@ -203,7 +203,7 @@ fi
 
 # Master backend service
 if ! gcloud --project "{{ gce_project_id }}" beta compute backend-services describe "{{ provision_prefix }}master-ssl-lb-backend" &>/dev/null; then
-    gcloud --project "{{ gce_project_id }}" beta compute backend-services create "{{ provision_prefix }}master-ssl-lb-backend" --health-checks "{{ provision_prefix }}master-ssl-lb-health-check" --port-name "{{ provision_prefix }}-port-name-master" --protocol "SSL" --global
+    gcloud --project "{{ gce_project_id }}" beta compute backend-services create "{{ provision_prefix }}master-ssl-lb-backend" --health-checks "{{ provision_prefix }}master-ssl-lb-health-check" --port-name "{{ provision_prefix }}-port-name-master" --protocol "SSL" --global --timeout="{{ provision_gce_master_https_timeout | default('2m') }}"
     gcloud --project "{{ gce_project_id }}" beta compute backend-services add-backend "{{ provision_prefix }}master-ssl-lb-backend" --instance-group "{{ provision_prefix }}ig-m" --global --instance-group-zone "{{ gce_zone_name }}"
 else
     echo "Backend service '{{ provision_prefix }}master-ssl-lb-backend' already exists"
