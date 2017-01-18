@@ -1,0 +1,125 @@
+# This playbook ensures that a base image is up to date with all of the required settings
+
+- name: Launch image build instance
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  tasks:
+    - name: Create the image instance disk
+      gce_pd:
+        service_account_email: "{{ gce_service_account }}"
+        credentials_file: "{{ playbook_dir + '/files/' + gcs_registry_keyfile }}"
+        project_id: "{{ gce_project_id }}"
+        zone: "{{ gce_zone_name }}"
+        name: "{{ provision_prefix }}build-image-instance"
+        disk_type: pd-ssd
+        image: "{{ provision_gce_base_image | default('https://www.googleapis.com/compute/v1/projects/rhel-cloud/global/images/rhel-7-v20170110') }}"
+        size_gb: 10
+        state: present
+
+    - name: Launch the image build instance
+      gce:
+        service_account_email: "{{ gce_service_account }}"
+        credentials_file: "{{ playbook_dir + '/files/' + gcs_registry_keyfile }}"
+        project_id: "{{ gce_project_id }}"
+        zone: "{{ gce_zone_name }}"
+        machine_type: n1-standard-1
+        instance_names: "{{ provision_prefix }}build-image-instance"
+        state: present
+        tags:
+          - build-image-instance
+        disk_auto_delete: false
+        disks:
+          - "{{ provision_prefix }}build-image-instance"
+      register: gce
+
+    - add_host:
+        hostname: "{{ item.public_ip }}"
+        groupname: build_instance_ips
+      with_items: "{{ gce.instance_data }}"
+
+    - name: Wait for instance to respond to SSH
+      wait_for:
+        delay: 1
+        host: "{{ item.public_ip }}"
+        port: 22
+        state: started
+        timeout: 120
+      with_items: "{{ gce.instance_data }}"
+
+- name: Build image
+  hosts: build_instance_ips
+  roles:
+    - role: rhel_subscribe
+      when: (deployment_type in ["enterprise", "atomic-enterprise", "openshift-enterprise"] or
+            ansible_distribution == "RedHat") and
+            lookup('oo_option', 'rhel_skip_subscription') | default(rhsub_skip, True) |
+              default('no', True) | lower in ['no', 'false']
+    - role: openshift_repos
+      vars:
+        openshift_additional_repos: []
+    - role: os_update_latest
+  post_tasks:
+    - name: Add the Google Cloud repo
+      yum_repository:
+        name: google-cloud-compute
+        description: Google Cloud Compute
+        baseurl: https://packages.cloud.google.com/yum/repos/google-cloud-compute-el7-x86_64
+        gpgkey: https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+        gpgcheck: yes
+        repo_gpgcheck: yes
+      when: ansible_os_family == "RedHat"
+    - name: Disable all repos on RHEL
+      command: subscription-manager repos --disable="*"
+      when: ansible_distribution == "RedHat"
+    - name: Enable repos for packages on RHEL
+      command: subscription-manager repos --enable="rhel-7-server-rpms" --enable="rhel-7-server-extras-rpms"
+      when: ansible_distribution == "RedHat"
+    - name: Install common image prerequisites
+      package: name={{ item }} state=latest
+      with_items:
+      - docker
+      - google-compute-engine
+      - google-compute-engine-init
+      - google-config
+      - wget
+      - git
+      - net-tools
+      - bind-utils
+      - iptables-services
+      - bridge-utils
+      - bash-completion
+    - name: Clean yum metadata
+      command: yum clean all
+      args:
+        warn: no
+      when: ansible_os_family == "RedHat"
+
+#- name: Install and configure image
+#  hosts: build_instance_ips
+#  tasks:
+#    #- yum: name=* state=latest update_cache=yes
+#    #  when: ansible_os_family == "RedHat"
+
+- name: Commit image
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: Terminate the image build instance
+      gce:
+        service_account_email: "{{ gce_service_account }}"
+        credentials_file: "{{ playbook_dir + '/files/' + gcs_registry_keyfile }}"
+        project_id: "{{ gce_project_id }}"
+        zone: "{{ gce_zone_name }}"
+        instance_names: "{{ provision_prefix }}build-image-instance"
+        state: absent
+    - name: Save the new image
+      command: gcloud --project "{{ gce_project_id}}" compute images create "{{ provision_gce_registered_image_id | default(provision_gce_registered_image + '-' + lookup('pipe','date +%Y%m%d-%H%M%S')) }}" --source-disk "{{ provision_prefix }}build-image-instance" --source-disk-zone "{{ gce_zone_name }}" --family "{{ provision_gce_registered_image }}"
+    - name: Remove the image instance disk
+      gce_pd:
+        service_account_email: "{{ gce_service_account }}"
+        credentials_file: "{{ playbook_dir + '/files/' + gcs_registry_keyfile }}"
+        project_id: "{{ gce_project_id }}"
+        zone: "{{ gce_zone_name }}"
+        name: "{{ provision_prefix }}build-image-instance"
+        state: absent

@@ -42,10 +42,14 @@ if [[ -n "{{ provision_gce_user_data_file }}" ]]; then
     metadata+="user-data={{ provision_gce_user_data_file }}"
 fi
 
-
-if ! gcloud --project "{{ gce_project_id }}" compute images describe "{{ provision_gce_registered_image }}" &>/dev/null; then
-    echo "No compute image found, create an image named '{{ provision_gce_registered_image }}' to continue'"
-    exit 1
+# Select image or image family
+image="{{ provision_gce_registered_image }}"
+if ! gcloud --project "{{ gce_project_id }}" compute images describe "${image}" &>/dev/null; then
+    if ! gcloud --project "{{ gce_project_id }}" compute images describe-from-family "${image}" &>/dev/null; then
+        echo "No compute image or image-family found, create an image named '{{ provision_gce_registered_image }}' to continue'"
+        exit 1
+    fi
+    image="family/${image}"
 fi
 
 ### PROVISION THE INFRASTRUCTURE ###
@@ -119,7 +123,7 @@ for i in `jobs -p`; do wait $i; done
 # Create instance templates
 (
 if ! gcloud --project "{{ gce_project_id }}" compute instance-templates describe "{{ provision_prefix }}instance-template-master" &>/dev/null; then
-    gcloud --project "{{ gce_project_id }}" compute instance-templates create "{{ provision_prefix }}instance-template-master" --machine-type "{{ provision_gce_machine_type_master }}" --network "{{ gce_network_name }}" --tags "{{ provision_prefix }}ocp,ocp,ocp-master{{ gce_extra_tags_master }}" --image "{{ provision_gce_registered_image }}" --boot-disk-size "35" --boot-disk-type "pd-ssd" --scopes logging-write,monitoring-write,useraccounts-ro,service-control,service-management,storage-ro,compute-rw ${metadata}
+    gcloud --project "{{ gce_project_id }}" compute instance-templates create "{{ provision_prefix }}instance-template-master" --machine-type "{{ provision_gce_machine_type_master }}" --network "{{ gce_network_name }}" --tags "{{ provision_prefix }}ocp,ocp,ocp-master{{ gce_extra_tags_master }}" --image "${image}" --boot-disk-size "35" --boot-disk-type "pd-ssd" --scopes logging-write,monitoring-write,useraccounts-ro,service-control,service-management,storage-ro,compute-rw ${metadata}
 else
     echo "Instance template '{{ provision_prefix }}instance-template-master' already exists"
 fi
@@ -135,7 +139,7 @@ fi
 
 (
 if ! gcloud --project "{{ gce_project_id }}" compute instance-templates describe "{{ provision_prefix }}instance-template-node" &>/dev/null; then
-    gcloud --project "{{ gce_project_id }}" compute instance-templates create "{{ provision_prefix }}instance-template-node" --machine-type "{{ provision_gce_machine_type_node }}" --network "{{ gce_network_name }}" --tags "{{ provision_prefix }}ocp,ocp,ocp-node{{ gce_extra_tags_node }}" --image "{{ provision_gce_registered_image }}" --boot-disk-size "25" --boot-disk-type "pd-ssd" --scopes logging-write,monitoring-write,useraccounts-ro,service-control,service-management,storage-ro,compute-rw ${metadata}
+    gcloud --project "{{ gce_project_id }}" compute instance-templates create "{{ provision_prefix }}instance-template-node" --machine-type "{{ provision_gce_machine_type_node }}" --network "{{ gce_network_name }}" --tags "{{ provision_prefix }}ocp,ocp,ocp-node{{ gce_extra_tags_node }}" --image "${image}" --boot-disk-size "25" --boot-disk-type "pd-ssd" --scopes logging-write,monitoring-write,useraccounts-ro,service-control,service-management,storage-ro,compute-rw ${metadata}
 else
     echo "Instance template '{{ provision_prefix }}instance-template-node' already exists"
 fi
@@ -150,7 +154,7 @@ fi
 
 (
 if ! gcloud --project "{{ gce_project_id }}" compute instance-templates describe "{{ provision_prefix }}instance-template-node-infra" &>/dev/null; then
-    gcloud --project "{{ gce_project_id }}" compute instance-templates create "{{ provision_prefix }}instance-template-node-infra" --machine-type "{{ provision_gce_machine_type_node_infra }}" --network "{{ gce_network_name }}" --tags "{{ provision_prefix }}ocp,ocp,ocp-infra-node{{ gce_extra_tags_node_infra }}" --image "{{ provision_gce_registered_image }}" --boot-disk-size "25" --boot-disk-type "pd-ssd" --scopes logging-write,monitoring-write,useraccounts-ro,service-control,service-management,storage-rw,compute-rw ${metadata}
+    gcloud --project "{{ gce_project_id }}" compute instance-templates create "{{ provision_prefix }}instance-template-node-infra" --machine-type "{{ provision_gce_machine_type_node_infra }}" --network "{{ gce_network_name }}" --tags "{{ provision_prefix }}ocp,ocp,ocp-infra-node{{ gce_extra_tags_node_infra }}" --image "${image}" --boot-disk-size "25" --boot-disk-type "pd-ssd" --scopes logging-write,monitoring-write,useraccounts-ro,service-control,service-management,storage-rw,compute-rw ${metadata}
 else
     echo "Instance template '{{ provision_prefix }}instance-template-node-infra' already exists"
 fi
