@@ -39,9 +39,12 @@ ENV ANSIBLE_INVENTORY=$WORK/inventory.sh
 RUN mkdir -p /usr/share/ansible $HOME/.ssh $WORK/playbooks/files && \
     ln -s $WORK/playbooks/files/ssh-privatekey $HOME/.ssh/google_compute_engine && \
     ln -s $WORK/playbooks/files/ssh-publickey $HOME/.ssh/google_compute_engine.pub && \
-    INSTALL_PKGS="python-dns python-libcloud pyOpenSSL ansible openssl gettext sudo" && \
+    INSTALL_PKGS="python-dns python-libcloud pyOpenSSL openssl gettext sudo" && \
     yum install -y $INSTALL_PKGS && \
     rpm -V $INSTALL_PKGS && \
+    curl https://kojipkgs.fedoraproject.org//packages/ansible/2.2.0.0/4.el7/noarch/ansible-2.2.0.0-4.el7.noarch.rpm > /tmp/ansible.rpm && \
+    yum install -y /tmp/ansible.rpm && \
+    rm /tmp/ansible.rpm && \
     yum clean all && \
     cd /usr/share/ansible && \
     git clone https://github.com/openshift/openshift-ansible.git && \
