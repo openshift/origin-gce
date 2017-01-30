@@ -8,4 +8,7 @@
   become: yes
   command: subscription-manager refresh
   when: ansible_os_family == "RedHat" and subscription_manager_check.rc == 0
-  ignore_errors: True
+  register: result
+  until: result.rc == 0
+  retries: 20
+  delay: 10
