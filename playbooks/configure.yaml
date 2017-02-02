@@ -8,7 +8,6 @@
 - hosts: cluster_hosts
   roles:
     - cluster-variables
-    - refresh-subscriptions
     - docker-storage-setup
     - gce-cloudconfig
     - frequent-log-rotation

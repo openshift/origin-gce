@@ -47,18 +47,21 @@
         timeout: 120
       with_items: "{{ gce.instance_data }}"
 
-- name: Build image
+- name: Prepare instance content sources
+  pre_tasks:
+  - set_fact:
+      allow_rhel_subscriptions: "{{ lookup('oo_option', 'rhel_skip_subscription') | default(rhsub_skip, True) | default('no', True) | lower in ['no', 'false'] }}"
+  - set_fact:
+      using_rhel_subscriptions: "{{ (deployment_type in ['enterprise', 'atomic-enterprise', 'openshift-enterprise'] or ansible_distribution == 'RedHat') and allow_rhel_subscriptions }}"
   hosts: build_instance_ips
   roles:
     - role: rhel_subscribe
-      when: (deployment_type in ["enterprise", "atomic-enterprise", "openshift-enterprise"] or
-            ansible_distribution == "RedHat") and
-            lookup('oo_option', 'rhel_skip_subscription') | default(rhsub_skip, True) |
-              default('no', True) | lower in ['no', 'false']
+      when: using_rhel_subscriptions
+    - role: custom-repositories
+      when: provision_custom_repositories
     - role: openshift_repos
       vars:
         openshift_additional_repos: []
-    - role: os_update_latest
   post_tasks:
     - name: Add the Google Cloud repo
       yum_repository:
@@ -69,12 +72,18 @@
         gpgcheck: yes
         repo_gpgcheck: yes
       when: ansible_os_family == "RedHat"
+
+- name: Build image
+  hosts: build_instance_ips
+  roles:
+    - role: os_update_latest
+  post_tasks:
     - name: Disable all repos on RHEL
       command: subscription-manager repos --disable="*"
-      when: ansible_distribution == "RedHat"
+      when: using_rhel_subscriptions
     - name: Enable repos for packages on RHEL
       command: subscription-manager repos --enable="rhel-7-server-rpms" --enable="rhel-7-server-extras-rpms"
-      when: ansible_distribution == "RedHat"
+      when: using_rhel_subscriptions
     - name: Install common image prerequisites
       package: name={{ item }} state=latest
       with_items:
