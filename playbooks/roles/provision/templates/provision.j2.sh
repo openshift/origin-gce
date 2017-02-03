@@ -309,48 +309,57 @@ else
     gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed set-target-pools "{{ provision_prefix }}{{ provision_gce_router_network_instance_group }}" --target-pools "{{ provision_prefix }}router-network-lb-pool" --zone "{{ gce_zone_name }}"
 fi
 
+# Retry DNS changes until they succeed since this may be a shared resource
+while true; do
+    dns="${TMPDIR:-/tmp}/dns.yaml"
+    rm -f $dns
 
-# DNS record for master lb
-dns="${TMPDIR:-/tmp}/dns.yaml"
-rm -f $dns
-
-if ! gcloud --project "{{ gce_project_id }}" dns record-sets list -z "${dns_zone}" --name "{{ openshift_master_cluster_public_hostname }}" 2>/dev/null | grep -q "{{ openshift_master_cluster_public_hostname }}"; then
-    IP=$(gcloud --project "{{ gce_project_id }}" compute addresses describe "{{ provision_prefix }}master-ssl-lb-ip" --global --format='value(address)')
-    if [[ ! -f $dns ]]; then
-        gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns start -z "${dns_zone}"
+    # DNS record for master lb
+    if ! gcloud --project "{{ gce_project_id }}" dns record-sets list -z "${dns_zone}" --name "{{ openshift_master_cluster_public_hostname }}" 2>/dev/null | grep -q "{{ openshift_master_cluster_public_hostname }}"; then
+        IP=$(gcloud --project "{{ gce_project_id }}" compute addresses describe "{{ provision_prefix }}master-ssl-lb-ip" --global --format='value(address)')
+        if [[ ! -f $dns ]]; then
+            gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns start -z "${dns_zone}"
+        fi
+        gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns add -z "${dns_zone}" --ttl 3600 --name "{{ openshift_master_cluster_public_hostname }}." --type A "$IP"
+    else
+        echo "DNS record for '{{ openshift_master_cluster_public_hostname }}' already exists"
     fi
-    gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns add -z "${dns_zone}" --ttl 3600 --name "{{ openshift_master_cluster_public_hostname }}." --type A "$IP"
-else
-    echo "DNS record for '{{ openshift_master_cluster_public_hostname }}' already exists"
-fi
 
-# DNS record for internal master lb
-if ! gcloud --project "{{ gce_project_id }}" dns record-sets list -z "${dns_zone}" --name "{{ openshift_master_cluster_hostname }}" 2>/dev/null | grep -q "{{ openshift_master_cluster_hostname }}"; then
-    IP=$(gcloud --project "{{ gce_project_id }}" compute addresses describe "{{ provision_prefix }}master-network-lb-ip" --region "{{ gce_region_name }}" --format='value(address)')
-    if [[ ! -f $dns ]]; then
-        gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns start -z "${dns_zone}"
+    # DNS record for internal master lb
+    if ! gcloud --project "{{ gce_project_id }}" dns record-sets list -z "${dns_zone}" --name "{{ openshift_master_cluster_hostname }}" 2>/dev/null | grep -q "{{ openshift_master_cluster_hostname }}"; then
+        IP=$(gcloud --project "{{ gce_project_id }}" compute addresses describe "{{ provision_prefix }}master-network-lb-ip" --region "{{ gce_region_name }}" --format='value(address)')
+        if [[ ! -f $dns ]]; then
+            gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns start -z "${dns_zone}"
+        fi
+        gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns add -z "${dns_zone}" --ttl 3600 --name "{{ openshift_master_cluster_hostname }}." --type A "$IP"
+    else
+        echo "DNS record for '{{ openshift_master_cluster_hostname }}' already exists"
     fi
-    gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns add -z "${dns_zone}" --ttl 3600 --name "{{ openshift_master_cluster_hostname }}." --type A "$IP"
-else
-    echo "DNS record for '{{ openshift_master_cluster_hostname }}' already exists"
-fi
 
-# DNS record for router lb
-if ! gcloud --project "{{ gce_project_id }}" dns record-sets list -z "${dns_zone}" --name "{{ wildcard_zone }}" 2>/dev/null | grep -q "{{ wildcard_zone }}"; then
-    IP=$(gcloud --project "{{ gce_project_id }}" compute addresses describe "{{ provision_prefix }}router-network-lb-ip" --region "{{ gce_region_name }}" --format='value(address)')
-    if [[ ! -f $dns ]]; then
-        gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns start -z "${dns_zone}"
+    # DNS record for router lb
+    if ! gcloud --project "{{ gce_project_id }}" dns record-sets list -z "${dns_zone}" --name "{{ wildcard_zone }}" 2>/dev/null | grep -q "{{ wildcard_zone }}"; then
+        IP=$(gcloud --project "{{ gce_project_id }}" compute addresses describe "{{ provision_prefix }}router-network-lb-ip" --region "{{ gce_region_name }}" --format='value(address)')
+        if [[ ! -f $dns ]]; then
+            gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns start -z "${dns_zone}"
+        fi
+        gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns add -z "${dns_zone}" --ttl 3600 --name "{{ wildcard_zone }}." --type A "$IP"
+        gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns add -z "${dns_zone}" --ttl 3600 --name "*.{{ wildcard_zone }}." --type CNAME "{{ wildcard_zone }}."
+    else
+        echo "DNS record for '{{ wildcard_zone }}' already exists"
     fi
-    gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns add -z "${dns_zone}" --ttl 3600 --name "{{ wildcard_zone }}." --type A "$IP"
-    gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns add -z "${dns_zone}" --ttl 3600 --name "*.{{ wildcard_zone }}." --type CNAME "{{ wildcard_zone }}."
-else
-    echo "DNS record for '{{ wildcard_zone }}' already exists"
-fi
 
-# Commit all DNS changes
-if [[ -f $dns ]]; then
-    gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns execute -z "${dns_zone}"
-fi
+    # Commit all DNS changes, retrying if preconditions are not met
+    if [[ -f $dns ]]; then
+        if ! out="$( gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns execute -z "${dns_zone}" 2>&1 )"; then
+            rc=$?
+            if [[ "${out}" == *"HTTPError 412: Precondition not met"* ]]; then
+                continue
+            fi
+            exit $rc
+        fi
+    fi
+    break
+done
 
 # Create bucket for registry
 ( if ! gsutil ls -p "{{ gce_project_id }}" "gs://{{ provision_gce_registry_gcs_bucket }}" &>/dev/null; then
