@@ -6,12 +6,6 @@
 #
 export PATH=$HOME/google-cloud-sdk/bin:$PATH
 
-if [[ -n "${OPENSHIFT_ANSIBLE_COMMIT-}" ]]; then
-  pushd /usr/share/ansible/openshift-ansible &>/dev/null
-  git checkout "${OPENSHIFT_ANSIBLE_COMMIT}" || git fetch origin && git checkout "${OPENSHIFT_ANSIBLE_COMMIT}"
-  popd &>/dev/null
-fi
-
 # When running with an invalid user, correct it by adding cloud-user (also
 # part of the image definition). Ansible requires getpwnam() to start.
 # Also set the default to localhost to become: no to avoid the need to
@@ -29,6 +23,12 @@ if ! whoami &>/dev/null; then
     echo "${key}" > "${keyfile}"
     chmod 0600 "${keyfile}"
   fi
+fi
+
+if [[ -n "${OPENSHIFT_ANSIBLE_COMMIT-}" ]]; then
+  pushd /usr/share/ansible/openshift-ansible &>/dev/null
+  git checkout "${OPENSHIFT_ANSIBLE_COMMIT}" || ( git fetch origin && git checkout "${OPENSHIFT_ANSIBLE_COMMIT}" )
+  popd &>/dev/null
 fi
 
 gcloud auth activate-service-account --key-file="${WORK}/playbooks/files/gce.json"
