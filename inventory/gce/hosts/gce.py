@@ -317,13 +317,13 @@ class GceInventory(object):
         while True:
             try:
                 nodes = self.driver.list_nodes()
+                break
             except libcloud.common.google.ResourceNotFoundError:
                 tries = tries + 1
                 if tries > 15:
                     raise e
                 time.sleep(1)
                 continue
-            break
 
         for node in nodes:
 
