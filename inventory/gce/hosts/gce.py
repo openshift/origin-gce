@@ -88,6 +88,7 @@ USER_AGENT_VERSION="v2"
 
 import sys
 import os
+import time
 import argparse
 import ConfigParser
 
@@ -308,7 +309,23 @@ class GceInventory(object):
         meta = {}
         meta["hostvars"] = {}
 
-        for node in self.driver.list_nodes():
+        # list_nodes will fail if a disk is in the process of being deleted
+        # from a node, which is not uncommon if other playbooks are managing
+        # the same project. Retry if we receive a not found error.
+        nodes = []
+        tries = 0
+        while True:
+            try:
+                nodes = self.driver.list_nodes()
+            except libcloud.common.google.ResourceNotFoundError:
+                tries = tries + 1
+                if tries > 15:
+                    raise e
+                time.sleep(1)
+                continue
+            break
+
+        for node in nodes:
 
             # This check filters on the desired instance states defined in the
             # config file with the instance_states config option.
