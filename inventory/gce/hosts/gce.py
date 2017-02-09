@@ -103,6 +103,7 @@ except ImportError:
 try:
     from libcloud.compute.types import Provider
     from libcloud.compute.providers import get_driver
+    from libcloud.common.google import ResourceNotFoundError
     _ = Provider.GCE
 except:
     sys.exit("GCE inventory script requires libcloud >= 0.13")
@@ -318,7 +319,7 @@ class GceInventory(object):
             try:
                 nodes = self.driver.list_nodes()
                 break
-            except libcloud.common.google.ResourceNotFoundError:
+            except ResourceNotFoundError:
                 tries = tries + 1
                 if tries > 15:
                     raise e
