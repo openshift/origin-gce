@@ -31,21 +31,33 @@ function teardown() {
 # DNS
 dns_zone="{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}"
 if gcloud --project "{{ gce_project_id }}" dns managed-zones describe "${dns_zone}" &>/dev/null; then
-    dns="${TMPDIR:-/tmp}/dns.yaml"
-    rm -f "${dns}"
-
-    # export all dns records that match into a zone format, and turn each line into a set of args for
-    # record-sets transaction.
-    gcloud dns record-sets export --project "{{ gce_project_id }}" -z "${dns_zone}" --zone-file-format "${dns}"
-    if grep -F -e '{{ openshift_master_cluster_hostname }}' -e '{{ openshift_master_cluster_public_hostname }}' -e '{{ wildcard_zone }}' "${dns}" | \
-            awk '{ print "--name", $1, "--ttl", $2, "--type", $4, $5; }' > "${dns}.input"
-    then
+    # Retry DNS changes until they succeed since this may be a shared resource
+    while true; do
+        dns="${TMPDIR:-/tmp}/dns.yaml"
         rm -f "${dns}"
-        gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns start -z "${dns_zone}"
-        cat "${dns}.input" | xargs -L1 gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file="${dns}" remove -z "${dns_zone}"
-        gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns execute -z "${dns_zone}"
+
+        # export all dns records that match into a zone format, and turn each line into a set of args for
+        # record-sets transaction.
+        gcloud dns record-sets export --project "{{ gce_project_id }}" -z "${dns_zone}" --zone-file-format "${dns}"
+        if grep -F -e '{{ openshift_master_cluster_hostname }}' -e '{{ openshift_master_cluster_public_hostname }}' -e '{{ wildcard_zone }}' "${dns}" | \
+                awk '{ print "--name", $1, "--ttl", $2, "--type", $4, $5; }' > "${dns}.input"
+        then
+            rm -f "${dns}"
+            gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns start -z "${dns_zone}"
+            cat "${dns}.input" | xargs -L1 gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file="${dns}" remove -z "${dns_zone}"
+
+            # Commit all DNS changes, retrying if preconditions are not met
+            if ! out="$( gcloud --project "{{ gce_project_id }}" dns record-sets transaction --transaction-file=$dns execute -z "${dns_zone}" 2>&1 )"; then
+                rc=$?
+                if [[ "${out}" == *"HTTPError 412: Precondition not met"* ]]; then
+                    continue
+                fi
+                exit $rc
+            fi
+        fi
         rm "${dns}.input"
-    fi
+        break
+    done
 fi
 
 (
