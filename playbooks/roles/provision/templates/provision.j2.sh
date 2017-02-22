@@ -169,30 +169,41 @@ fi
 
 for i in `jobs -p`; do wait $i; done
 
+# Make attach idempotent and reentrant
+function try_attach_disk() {
+    if ! out=$( gcloud --project "{{ gce_project_id }}" compute instances attach-disk "$1" --disk "$2" --zone "$3" 2>&1 ); then
+        if [[ "${out}" == *"is already being used by"* ]]; then
+            echo "Disk '$2' already attached"
+            return 0
+        fi
+        echo "${out}" 1>&2
+        return 1
+    fi
+    # TODO: identify whether we should turn on auto-delete
+    # gcloud --project "{{ gce_project_id }}" compute instances set-disk-auto-delete "$1" --disk "$2" --zone "$3" --auto-delete
+}
+
 # Attach additional disks to instances for docker storage
+# TODO: do we actually want multiple disks?make
 instances=$(gcloud --project "{{ gce_project_id }}" compute instances list --filter='tags.items:{{ provision_prefix }}ocp AND tags.items:ocp' --format='value(name)')
 for i in $instances; do
-    ( docker_disk="${i}-docker"
+    (
     instance_zone=$(gcloud --project "{{ gce_project_id }}" compute instances list --filter="name:${i}" --format='value(zone)')
+    docker_disk="${i}-docker"
     if ! gcloud --project "{{ gce_project_id }}" compute disks describe "$docker_disk" --zone "$instance_zone" &>/dev/null; then
         gcloud --project "{{ gce_project_id }}" compute disks create "$docker_disk" --zone "$instance_zone" --size "{{ provision_gce_disk_size_node_docker }}" --type "pd-ssd"
-        gcloud --project "{{ gce_project_id }}" compute instances attach-disk "${i}" --disk "$docker_disk" --zone "$instance_zone"
     else
         echo "Disk '${docker_disk}' already exists"
-    fi ) &
-done
-
-# Attach additional disks to node instances for openshift storage
-instances=$(gcloud --project "{{ gce_project_id }}" compute instances list --filter='tags.items:{{ provision_prefix }}ocp AND (tags.items:ocp-node OR tags.items:ocp-infra-node)' --format='value(name)')
-for i in $instances; do
-    ( openshift_disk="${i}-openshift"
-    instance_zone=$(gcloud --project "{{ gce_project_id }}" compute instances list --filter="name:${i}" --format='value(zone)')
+    fi
+    openshift_disk="${i}-openshift"
     if ! gcloud --project "{{ gce_project_id }}" compute disks describe "$openshift_disk" --zone "$instance_zone" &>/dev/null; then
         gcloud --project "{{ gce_project_id }}" compute disks create "$openshift_disk" --zone "$instance_zone" --size "{{ provision_gce_disk_size_node_openshift }}" --type "pd-ssd"
-        gcloud --project "{{ gce_project_id }}" compute instances attach-disk "${i}" --disk "$openshift_disk" --zone "$instance_zone"
     else
         echo "Disk '${openshift_disk}' already exists"
-    fi ) &
+    fi
+    try_attach_disk "${i}" "${docker_disk}" "${instance_zone}"
+    try_attach_disk "${i}" "${openshift_disk}" "${instance_zone}"
+    ) &
 done
 
 for i in `jobs -p`; do wait $i; done
@@ -206,7 +217,7 @@ else
 fi
 
 # Master backend service
-if ! gcloud --project "{{ gce_project_id }}" beta compute backend-services describe "{{ provision_prefix }}master-ssl-lb-backend" &>/dev/null; then
+if ! gcloud --project "{{ gce_project_id }}" beta compute backend-services describe "{{ provision_prefix }}master-ssl-lb-backend" --global &>/dev/null; then
     gcloud --project "{{ gce_project_id }}" beta compute backend-services create "{{ provision_prefix }}master-ssl-lb-backend" --health-checks "{{ provision_prefix }}master-ssl-lb-health-check" --port-name "{{ provision_prefix }}-port-name-master" --protocol "SSL" --global --timeout="{{ provision_gce_master_https_timeout | default('2m') }}"
     gcloud --project "{{ gce_project_id }}" beta compute backend-services add-backend "{{ provision_prefix }}master-ssl-lb-backend" --instance-group "{{ provision_prefix }}ig-m" --global --instance-group-zone "{{ gce_zone_name }}"
 else
@@ -369,3 +380,18 @@ else
 fi ) &
 
 for i in `jobs -p`; do wait $i; done
+
+
+# Wait for any remaining disks to be attached
+done=
+for i in `seq 1 60`; do
+    if [[ -z "$( gcloud --project "{{ gce_project_id }}" compute operations list --zones "{{ gce_zone_name }}" --filter 'operationType=attachDisk AND NOT status=DONE AND targetLink : "{{ provision_prefix }}ig-"' --page-size=10 --format 'value(targetLink)' --limit 1 )" ]]; then
+        done=1
+        break
+    fi
+    sleep 2
+done
+if [[ -z "${done}" ]]; then
+    echo "Failed to attach disks"
+    exit 1
+fi
