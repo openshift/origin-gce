@@ -60,6 +60,23 @@ if gcloud --project "{{ gce_project_id }}" dns managed-zones describe "${dns_zon
     done
 fi
 
+# Preemptively spin down the instances
+(
+if gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed describe "{{ provision_prefix }}ig-m" &>/dev/null; then
+    gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed resize "{{ provision_prefix }}ig-m" --size=0 --zone "{{ gce_zone_name }}"
+fi
+) &
+(
+if gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed describe "{{ provision_prefix }}ig-i" &>/dev/null; then
+    gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed resize "{{ provision_prefix }}ig-i" --size=0 --zone "{{ gce_zone_name }}"
+fi
+) &
+(
+if gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed describe "{{ provision_prefix }}ig-n" &>/dev/null; then
+    gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed resize "{{ provision_prefix }}ig-n" --size=0 --zone "{{ gce_zone_name }}"
+fi
+) &
+
 (
 # Router network rules
 teardown "{{ provision_prefix }}router-network-lb-rule" compute forwarding-rules --region "{{ gce_region_name }}"
@@ -87,31 +104,47 @@ teardown "{{ provision_prefix }}master-ssl-lb-health-check" compute health-check
 # Additional disks for instances for docker storage
 instances=$(gcloud --project "{{ gce_project_id }}" compute instances list --filter='tags.items:{{ provision_prefix }}ocp AND tags.items:ocp' --format='value(name)')
 for i in $instances; do
-    ( docker_disk="${i}-docker"
+    (
     instance_zone=$(gcloud --project "{{ gce_project_id }}" compute instances list --filter="name:${i}" --format='value(zone)')
+    docker_disk="${i}-docker"
     if gcloud --project "{{ gce_project_id }}" compute disks describe "$docker_disk" --zone "$instance_zone" &>/dev/null; then
         if ! gcloud --project "{{ gce_project_id }}" compute instances detach-disk "${i}" --disk "$docker_disk" --zone "$instance_zone"; then
-            echo "warning: Unable to detach disk or already detached" 1>&2
+            echo "warning: Unable to detach docker disk or already detached" 1>&2
         fi
-        gcloud -q --project "{{ gce_project_id }}" compute disks delete "$docker_disk" --zone "$instance_zone"
+    fi
+    openshift_disk="${i}-openshift"
+    if gcloud --project "{{ gce_project_id }}" compute disks describe "$openshift_disk" --zone "$instance_zone" &>/dev/null; then
+        if ! gcloud --project "{{ gce_project_id }}" compute instances detach-disk "${i}" --disk "$openshift_disk" --zone "$instance_zone"; then
+            echo "warning: Unable to detach openshift disk or already detached" 1>&2
+        fi
     fi
     ) &
 done
 
-# Additional disks for node instances for openshift storage
-instances=$(gcloud --project "{{ gce_project_id }}" compute instances list --filter='tags.items:{{ provision_prefix }}ocp AND (tags.items:ocp-node OR tags.items:ocp-infra-node)' --format='value(name)')
-for i in $instances; do
-    ( openshift_disk="${i}-openshift"
-    instance_zone=$(gcloud --project "{{ gce_project_id }}" compute instances list --filter="name:${i}" --format='value(zone)')
-    if gcloud --project "{{ gce_project_id }}" compute disks describe "$openshift_disk" --zone "$instance_zone" &>/dev/null; then
-        if ! gcloud --project "{{ gce_project_id }}" compute instances detach-disk "${i}" --disk "$openshift_disk" --zone "$instance_zone"; then
-            echo "warning: Unable to detach disk or already detached" 1>&2
-        fi
-        gcloud -q --project "{{ gce_project_id }}" compute disks delete "$openshift_disk" --zone "$instance_zone"
-    fi ) &
-done
-
 for i in `jobs -p`; do wait $i; done
+
+# Wait for any remaining disks to be detached
+done=
+for i in `seq 1 60`; do
+    if [[ -z "$( gcloud --project "{{ gce_project_id }}" compute operations list --zones "{{ gce_zone_name }}" --filter 'operationType=detachDisk AND NOT status=DONE AND targetLink : "{{ provision_prefix }}ig-"' --page-size=10 --format 'value(targetLink)' --limit 1 )" ]]; then
+        done=1
+        break
+    fi
+    sleep 2
+done
+if [[ -z "${done}" ]]; then
+    echo "Failed to detach disks"
+    exit 1
+fi
+
+# Delete the disks in parallel with instance operations. Ignore failures to avoid preventing other expensive resources from
+# being removed.
+instances=$(gcloud --project "{{ gce_project_id }}" compute instances list --filter='tags.items:{{ provision_prefix }}ocp AND tags.items:ocp' --format='value(name)')
+for i in $instances; do
+    instance_zone=$(gcloud --project "{{ gce_project_id }}" compute instances list --filter="name:${i}" --format='value(zone)')
+    ( gcloud -q --project "{{ gce_project_id }}" compute disks delete "${i}-docker" --zone "$instance_zone" || true ) &
+    ( gcloud -q --project "{{ gce_project_id }}" compute disks delete "${i}-openshift" --zone "$instance_zone" || true ) &
+done
 
 # Instance groups
 ( teardown "{{ provision_prefix }}ig-m" beta compute instance-groups managed --zone "{{ gce_zone_name }}" ) &
