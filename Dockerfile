@@ -56,6 +56,9 @@ RUN mkdir -p /usr/share/ansible $HOME/.ssh $WORK/playbooks/files && \
     ./google-cloud-sdk/bin/gcloud -q components install beta && \
     ./google-cloud-sdk/install.sh -q --usage-reporting false && \
     echo 'ALL ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers && \
+    mkdir -p /usr/share/ansible/plugins/callback && \
+    curl -sS https://raw.githubusercontent.com/openshift/origin-ci-tool/master/oct/ansible/oct/callback_plugins/default_with_output_lists.py > /usr/share/ansible/plugins/callback/default_with_output_lists.py && \
+    sed -i 's/^#?stdout_callback/stdout_callback = default_with_output_lists/' /etc/ansible/ansible.cfg && \
     chmod -R g+w /usr/share/ansible $HOME /etc/passwd
 
 WORKDIR $WORK
