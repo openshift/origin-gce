@@ -29,7 +29,8 @@ LABEL io.k8s.display-name="OpenShift GCE Install Environment" \
 ENV WORK=/usr/share/ansible/openshift-ansible-gce \
     HOME=/home/cloud-user \
     GOOGLE_CLOUD_SDK_VERSION=147.0.0 \
-    OPENSHIFT_ANSIBLE_TAG=master
+    OPENSHIFT_ANSIBLE_TAG=master \
+    ANSIBLE_JUNIT_DIR=/tmp/openshift/ansible_junit
 
 # meta refresh_inventory has a bug in 2.2.0 where it uses relative path
 # remove when fixed
@@ -39,9 +40,10 @@ ENV ANSIBLE_INVENTORY=$WORK/inventory.sh
 RUN mkdir -p /usr/share/ansible $HOME/.ssh $WORK/playbooks/files && \
     ln -s $WORK/playbooks/files/ssh-privatekey $HOME/.ssh/google_compute_engine && \
     ln -s $WORK/playbooks/files/ssh-publickey $HOME/.ssh/google_compute_engine.pub && \
-    INSTALL_PKGS="python-dns python-libcloud pyOpenSSL openssl gettext sudo" && \
+    INSTALL_PKGS="python-dns python-libcloud python2-pip pyOpenSSL openssl gettext sudo" && \
     yum install -y $INSTALL_PKGS && \
     rpm -V $INSTALL_PKGS && \
+    pip install junit_xml && \
     curl https://kojipkgs.fedoraproject.org//packages/ansible/2.2.0.0/4.el7/noarch/ansible-2.2.0.0-4.el7.noarch.rpm > /tmp/ansible.rpm && \
     yum install -y /tmp/ansible.rpm && \
     rm /tmp/ansible.rpm && \
@@ -58,7 +60,9 @@ RUN mkdir -p /usr/share/ansible $HOME/.ssh $WORK/playbooks/files && \
     echo 'ALL ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers && \
     mkdir -p /usr/share/ansible/plugins/callback && \
     curl -sS https://raw.githubusercontent.com/openshift/origin-ci-tool/master/oct/ansible/oct/callback_plugins/default_with_output_lists.py > /usr/share/ansible/plugins/callback/default_with_output_lists.py && \
-    sed -i 's/^#?stdout_callback/stdout_callback = default_with_output_lists/' /etc/ansible/ansible.cfg && \
+    sed -r -i 's/^#?stdout_callback.*/stdout_callback = default_with_output_lists/' /etc/ansible/ansible.cfg && \
+    curl -sS https://raw.githubusercontent.com/openshift/origin-ci-tool/master/oct/ansible/oct/callback_plugins/generate_junit.py > /usr/share/ansible/plugins/callback/generate_junit.py && \
+    sed -r -i 's/^#?callback_whitelist.*/callback_whitelist = generate_junit/' /etc/ansible/ansible.cfg && \
     chmod -R g+w /usr/share/ansible $HOME /etc/passwd
 
 WORKDIR $WORK
