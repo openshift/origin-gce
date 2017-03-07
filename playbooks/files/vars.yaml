@@ -54,9 +54,6 @@ openshift_schedulable: True
 gce_project_id: openshift-gce-devel
 gce_region_name: us-central1
 gce_zone_name: us-central1-a
-# Name of the service account for gce_service_account_keyfile
-# TODO: can be removed
-gce_service_account: ci-provisioner@openshift-gce-devel.iam.gserviceaccount.com
 # A GCE service account JSON file that has sufficient permission to provision all instances
 # on the cluster and to also act as the cloud provider (create service load balancers, set
 # routes, provision PVs). You may restrict the permission of the account after creation.
