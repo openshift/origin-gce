@@ -7,8 +7,8 @@
   tasks:
     - name: Create the image instance disk
       gce_pd:
-        service_account_email: "{{ gce_service_account }}"
-        credentials_file: "{{ playbook_dir + '/files/' + gcs_registry_keyfile }}"
+        service_account_email: "{{ (lookup('file', playbook_dir + '/files/' + gce_service_account_keyfile ) | from_json ).client_email }}"
+        credentials_file: "{{ playbook_dir + '/files/' + gce_service_account_keyfile }}"
         project_id: "{{ gce_project_id }}"
         zone: "{{ gce_zone_name }}"
         name: "{{ provision_prefix }}build-image-instance"
@@ -19,8 +19,8 @@
 
     - name: Launch the image build instance
       gce:
-        service_account_email: "{{ gce_service_account }}"
-        credentials_file: "{{ playbook_dir + '/files/' + gcs_registry_keyfile }}"
+        service_account_email: "{{ (lookup('file', playbook_dir + '/files/' + gce_service_account_keyfile ) | from_json ).client_email }}"
+        credentials_file: "{{ playbook_dir + '/files/' + gce_service_account_keyfile }}"
         project_id: "{{ gce_project_id }}"
         zone: "{{ gce_zone_name }}"
         machine_type: n1-standard-1
@@ -116,8 +116,8 @@
   tasks:
     - name: Terminate the image build instance
       gce:
-        service_account_email: "{{ gce_service_account }}"
-        credentials_file: "{{ playbook_dir + '/files/' + gcs_registry_keyfile }}"
+        service_account_email: "{{ (lookup('file', playbook_dir + '/files/' + gce_service_account_keyfile ) | from_json ).client_email }}"
+        credentials_file: "{{ playbook_dir + '/files/' + gce_service_account_keyfile }}"
         project_id: "{{ gce_project_id }}"
         zone: "{{ gce_zone_name }}"
         instance_names: "{{ provision_prefix }}build-image-instance"
@@ -126,8 +126,8 @@
       command: gcloud --project "{{ gce_project_id}}" compute images create "{{ provision_gce_registered_image_id | default(provision_gce_registered_image + '-' + lookup('pipe','date +%Y%m%d-%H%M%S')) }}" --source-disk "{{ provision_prefix }}build-image-instance" --source-disk-zone "{{ gce_zone_name }}" --family "{{ provision_gce_registered_image }}"
     - name: Remove the image instance disk
       gce_pd:
-        service_account_email: "{{ gce_service_account }}"
-        credentials_file: "{{ playbook_dir + '/files/' + gcs_registry_keyfile }}"
+        service_account_email: "{{ (lookup('file', playbook_dir + '/files/' + gce_service_account_keyfile ) | from_json ).client_email }}"
+        credentials_file: "{{ playbook_dir + '/files/' + gce_service_account_keyfile }}"
         project_id: "{{ gce_project_id }}"
         zone: "{{ gce_zone_name }}"
         name: "{{ provision_prefix }}build-image-instance"
