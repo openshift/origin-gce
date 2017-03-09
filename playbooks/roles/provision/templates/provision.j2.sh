@@ -129,9 +129,9 @@ else
 fi
 
 # Create Master instance group
-if ! gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed describe "{{ provision_prefix }}ig-m" --zone "{{ gce_zone_name }}" &>/dev/null; then
-    gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed create "{{ provision_prefix }}ig-m" --zone "{{ gce_zone_name }}" --template "{{ provision_prefix }}instance-template-master" --size "{{ provision_gce_instance_group_size_master }}"
-    gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed set-named-ports "{{ provision_prefix }}ig-m" --zone "{{ gce_zone_name }}" --named-ports "{{ provision_prefix }}-port-name-master:{{ internal_console_port }}"
+if ! gcloud --project "{{ gce_project_id }}" compute instance-groups managed describe "{{ provision_prefix }}ig-m" --zone "{{ gce_zone_name }}" &>/dev/null; then
+    gcloud --project "{{ gce_project_id }}" compute instance-groups managed create "{{ provision_prefix }}ig-m" --zone "{{ gce_zone_name }}" --template "{{ provision_prefix }}instance-template-master" --size "{{ provision_gce_instance_group_size_master }}"
+    gcloud --project "{{ gce_project_id }}" compute instance-groups managed set-named-ports "{{ provision_prefix }}ig-m" --zone "{{ gce_zone_name }}" --named-ports "{{ provision_prefix }}-port-name-master:{{ internal_console_port }}"
 else
     echo "Instance group '{{ provision_prefix }}ig-m' already exists"
 fi
@@ -145,8 +145,8 @@ else
 fi
 
 # Create Node instance group
-if ! gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed describe "{{ provision_prefix }}ig-n" --zone "{{ gce_zone_name }}" &>/dev/null; then
-    gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed create "{{ provision_prefix }}ig-n" --zone "{{ gce_zone_name }}" --template "{{ provision_prefix }}instance-template-node" --size "{{ provision_gce_instance_group_size_node }}"
+if ! gcloud --project "{{ gce_project_id }}" compute instance-groups managed describe "{{ provision_prefix }}ig-n" --zone "{{ gce_zone_name }}" &>/dev/null; then
+    gcloud --project "{{ gce_project_id }}" compute instance-groups managed create "{{ provision_prefix }}ig-n" --zone "{{ gce_zone_name }}" --template "{{ provision_prefix }}instance-template-node" --size "{{ provision_gce_instance_group_size_node }}"
 else
     echo "Instance group '{{ provision_prefix }}ig-n' already exists"
 fi
@@ -160,8 +160,8 @@ else
 fi
 
 # Create Infra node instance group
-if ! gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed describe "{{ provision_prefix }}ig-i" --zone "{{ gce_zone_name }}" &>/dev/null; then
-        gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed create "{{ provision_prefix }}ig-i" --zone "{{ gce_zone_name }}" --template "{{ provision_prefix }}instance-template-node-infra" --size "{{ provision_gce_instance_group_size_node_infra }}"
+if ! gcloud --project "{{ gce_project_id }}" compute instance-groups managed describe "{{ provision_prefix }}ig-i" --zone "{{ gce_zone_name }}" &>/dev/null; then
+        gcloud --project "{{ gce_project_id }}" compute instance-groups managed create "{{ provision_prefix }}ig-i" --zone "{{ gce_zone_name }}" --template "{{ provision_prefix }}instance-template-node-infra" --size "{{ provision_gce_instance_group_size_node_infra }}"
 else
     echo "Instance group '{{ provision_prefix }}ig-i' already exists"
 fi
@@ -217,9 +217,9 @@ else
 fi
 
 # Master backend service
-if ! gcloud --project "{{ gce_project_id }}" beta compute backend-services describe "{{ provision_prefix }}master-ssl-lb-backend" --global &>/dev/null; then
-    gcloud --project "{{ gce_project_id }}" beta compute backend-services create "{{ provision_prefix }}master-ssl-lb-backend" --health-checks "{{ provision_prefix }}master-ssl-lb-health-check" --port-name "{{ provision_prefix }}-port-name-master" --protocol "SSL" --global --timeout="{{ provision_gce_master_https_timeout | default('2m') }}"
-    gcloud --project "{{ gce_project_id }}" beta compute backend-services add-backend "{{ provision_prefix }}master-ssl-lb-backend" --instance-group "{{ provision_prefix }}ig-m" --global --instance-group-zone "{{ gce_zone_name }}"
+if ! gcloud --project "{{ gce_project_id }}" compute backend-services describe "{{ provision_prefix }}master-ssl-lb-backend" --global &>/dev/null; then
+    gcloud --project "{{ gce_project_id }}" compute backend-services create "{{ provision_prefix }}master-ssl-lb-backend" --health-checks "{{ provision_prefix }}master-ssl-lb-health-check" --port-name "{{ provision_prefix }}-port-name-master" --protocol "SSL" --global --timeout="{{ provision_gce_master_https_timeout | default('2m') }}"
+    gcloud --project "{{ gce_project_id }}" compute backend-services add-backend "{{ provision_prefix }}master-ssl-lb-backend" --instance-group "{{ provision_prefix }}ig-m" --global --instance-group-zone "{{ gce_zone_name }}"
 else
     echo "Backend service '{{ provision_prefix }}master-ssl-lb-backend' already exists"
 fi
@@ -314,10 +314,10 @@ for i in `jobs -p`; do wait $i; done
 
 # set the target pools
 if [[ "ig-m" == "{{ provision_gce_router_network_instance_group }}" ]]; then
-    gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed set-target-pools "{{ provision_prefix }}ig-m" --target-pools "{{ provision_prefix }}master-network-lb-pool,{{ provision_prefix }}router-network-lb-pool" --zone "{{ gce_zone_name }}"
+    gcloud --project "{{ gce_project_id }}" compute instance-groups managed set-target-pools "{{ provision_prefix }}ig-m" --target-pools "{{ provision_prefix }}master-network-lb-pool,{{ provision_prefix }}router-network-lb-pool" --zone "{{ gce_zone_name }}"
 else
-    gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed set-target-pools "{{ provision_prefix }}ig-m" --target-pools "{{ provision_prefix }}master-network-lb-pool" --zone "{{ gce_zone_name }}"
-    gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed set-target-pools "{{ provision_prefix }}{{ provision_gce_router_network_instance_group }}" --target-pools "{{ provision_prefix }}router-network-lb-pool" --zone "{{ gce_zone_name }}"
+    gcloud --project "{{ gce_project_id }}" compute instance-groups managed set-target-pools "{{ provision_prefix }}ig-m" --target-pools "{{ provision_prefix }}master-network-lb-pool" --zone "{{ gce_zone_name }}"
+    gcloud --project "{{ gce_project_id }}" compute instance-groups managed set-target-pools "{{ provision_prefix }}{{ provision_gce_router_network_instance_group }}" --target-pools "{{ provision_prefix }}router-network-lb-pool" --zone "{{ gce_zone_name }}"
 fi
 
 # Retry DNS changes until they succeed since this may be a shared resource
