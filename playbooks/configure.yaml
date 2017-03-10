@@ -61,11 +61,11 @@
     - openshift-registry
     - openshift-roles
 
-- hosts: localhost
-  roles:
-    - validate-public
-
 - hosts: masters
   gather_facts: no
   roles:
     - validate-masters
+
+- hosts: localhost
+  roles:
+    - validate-public

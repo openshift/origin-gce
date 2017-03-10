@@ -62,18 +62,18 @@ fi
 
 # Preemptively spin down the instances
 (
-if gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed describe "{{ provision_prefix }}ig-m" &>/dev/null; then
-    gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed resize "{{ provision_prefix }}ig-m" --size=0 --zone "{{ gce_zone_name }}"
+if gcloud --project "{{ gce_project_id }}" compute instance-groups managed describe "{{ provision_prefix }}ig-m" &>/dev/null; then
+    gcloud --project "{{ gce_project_id }}" compute instance-groups managed resize "{{ provision_prefix }}ig-m" --size=0 --zone "{{ gce_zone_name }}"
 fi
 ) &
 (
-if gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed describe "{{ provision_prefix }}ig-i" &>/dev/null; then
-    gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed resize "{{ provision_prefix }}ig-i" --size=0 --zone "{{ gce_zone_name }}"
+if gcloud --project "{{ gce_project_id }}" compute instance-groups managed describe "{{ provision_prefix }}ig-i" &>/dev/null; then
+    gcloud --project "{{ gce_project_id }}" compute instance-groups managed resize "{{ provision_prefix }}ig-i" --size=0 --zone "{{ gce_zone_name }}"
 fi
 ) &
 (
-if gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed describe "{{ provision_prefix }}ig-n" &>/dev/null; then
-    gcloud --project "{{ gce_project_id }}" beta compute instance-groups managed resize "{{ provision_prefix }}ig-n" --size=0 --zone "{{ gce_zone_name }}"
+if gcloud --project "{{ gce_project_id }}" compute instance-groups managed describe "{{ provision_prefix }}ig-n" &>/dev/null; then
+    gcloud --project "{{ gce_project_id }}" compute instance-groups managed resize "{{ provision_prefix }}ig-n" --size=0 --zone "{{ gce_zone_name }}"
 fi
 ) &
 
@@ -97,7 +97,7 @@ teardown "{{ provision_prefix }}master-ssl-lb-rule" compute forwarding-rules --g
 teardown "{{ provision_prefix }}master-ssl-lb-target" compute target-ssl-proxies
 teardown "{{ provision_prefix }}master-ssl-lb-cert" compute ssl-certificates
 teardown "{{ provision_prefix }}master-ssl-lb-ip" compute addresses --global
-teardown "{{ provision_prefix }}master-ssl-lb-backend" beta compute backend-services --global
+teardown "{{ provision_prefix }}master-ssl-lb-backend" compute backend-services --global
 teardown "{{ provision_prefix }}master-ssl-lb-health-check" compute health-checks
 ) &
 
@@ -147,9 +147,9 @@ for i in $instances; do
 done
 
 # Instance groups
-( teardown "{{ provision_prefix }}ig-m" beta compute instance-groups managed --zone "{{ gce_zone_name }}" ) &
-( teardown "{{ provision_prefix }}ig-n" beta compute instance-groups managed --zone "{{ gce_zone_name }}" ) &
-( teardown "{{ provision_prefix }}ig-i" beta compute instance-groups managed --zone "{{ gce_zone_name }}" ) &
+( teardown "{{ provision_prefix }}ig-m" compute instance-groups managed --zone "{{ gce_zone_name }}" ) &
+( teardown "{{ provision_prefix }}ig-n" compute instance-groups managed --zone "{{ gce_zone_name }}" ) &
+( teardown "{{ provision_prefix }}ig-i" compute instance-groups managed --zone "{{ gce_zone_name }}" ) &
 
 for i in `jobs -p`; do wait $i; done
 
