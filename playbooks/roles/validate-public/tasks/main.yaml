@@ -3,5 +3,8 @@
   uri:
      url: "https://{{ openshift_master_cluster_public_hostname }}:{{ console_port }}/healthz/ready"
      validate_certs: False
-     status_code: 200
      method: GET
+  register: resp
+  until: resp.status == 200
+  retries: 3
+  delay: 10

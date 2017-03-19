@@ -3,17 +3,26 @@
   uri:
      url: "https://{{ openshift_master_cluster_public_hostname }}:{{ console_port }}/healthz/ready"
      validate_certs: False
-     status_code: 200
      method: GET
+  register: resp
+  until: resp.status == 200
+  retries: 3
+  delay: 10
 - name: Validate the internal address
   uri:
      url: "https://{{ openshift_master_cluster_hostname }}:{{ internal_console_port }}/healthz/ready"
      validate_certs: False
-     status_code: 200
      method: GET
+  register: resp
+  until: resp.status == 200
+  retries: 3
+  delay: 10
 - name: Validate the master address
   uri:
      url: "https://{{ inventory_hostname }}:{{ internal_console_port }}/healthz/ready"
      validate_certs: False
-     status_code: 200
      method: GET
+  register: resp
+  until: resp.status == 200
+  retries: 3
+  delay: 10
