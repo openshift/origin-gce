@@ -51,7 +51,7 @@ openshift_schedulable: True
 # GCE provisioning info
 
 # Project ID and zone settings for Google Cloud
-gce_project_id: openshift-gce-devel
+gce_project_id: "{{ (lookup('file', 'files/gce.json' ) | default('openshift-gce-devel') | from_json).get('project_id') }}"
 gce_region_name: us-central1
 gce_zone_name: us-central1-a
 # A GCE service account JSON file that has sufficient permission to provision all instances
