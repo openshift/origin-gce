@@ -40,7 +40,7 @@ ENV ANSIBLE_INVENTORY=$WORK/inventory.sh
 RUN mkdir -p /usr/share/ansible $HOME/.ssh $WORK/playbooks/files && \
     ln -s $WORK/playbooks/files/ssh-privatekey $HOME/.ssh/google_compute_engine && \
     ln -s $WORK/playbooks/files/ssh-publickey $HOME/.ssh/google_compute_engine.pub && \
-    INSTALL_PKGS="python-dns python-libcloud python2-pip pyOpenSSL openssl gettext sudo" && \
+    INSTALL_PKGS="python-dns python2-libcloud python2-pip pyOpenSSL openssl gettext sudo" && \
     yum install -y $INSTALL_PKGS && \
     rpm -V $INSTALL_PKGS && \
     pip install junit_xml && \
