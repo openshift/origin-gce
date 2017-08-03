@@ -61,7 +61,11 @@ RUN mkdir -p /usr/share/ansible $HOME/.ssh $WORK/playbooks/files && \
     sed -r -i 's/^#?stdout_callback.*/stdout_callback = default_with_output_lists/' /etc/ansible/ansible.cfg && \
     curl -sS https://raw.githubusercontent.com/openshift/origin-ci-tool/master/oct/ansible/oct/callback_plugins/generate_junit.py > /usr/share/ansible/plugins/callback/generate_junit.py && \
     sed -r -i 's/^#?callback_whitelist.*/callback_whitelist = generate_junit/' /etc/ansible/ansible.cfg && \
-    chmod -R g+w /usr/share/ansible $HOME /etc/passwd
+    chmod -R g+w /usr/share/ansible $HOME /etc/passwd && \
+    cd /usr/lib/python2.7/site-packages/libcloud && \
+    curl -sS https://patch-diff.githubusercontent.com/raw/apache/libcloud/pull/1010.patch > /tmp/patch && \
+    sudo patch -p2 < /tmp/patch && \
+    rm /tmp/patch
 
 WORKDIR $WORK
 ENTRYPOINT ["/usr/share/ansible/openshift-ansible-gce/entrypoint.sh"]
