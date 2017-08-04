@@ -65,13 +65,21 @@
   post_tasks:
     - name: Add the Google Cloud repo
       yum_repository:
-        name: google-cloud-compute
+        name: google-cloud
         description: Google Cloud Compute
         baseurl: https://packages.cloud.google.com/yum/repos/google-cloud-compute-el7-x86_64
         gpgkey: https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
         gpgcheck: yes
         repo_gpgcheck: yes
+        state: present
       when: ansible_os_family == "RedHat"
+
+# GCE instances are starting with xfs AND barrier=1, which is only for extfs.
+- name: Verify fstab entries are correct for XFS volumes
+  hosts: build_instance_ips
+  tasks:
+  - name: Remove barrier=1 from XFS fstab entries
+    command: sed -i -e 's/xfs\(.*\)barrier=1/xfs\1/g; s/, / /g' /etc/fstab
 
 - name: Build image
   hosts: build_instance_ips
