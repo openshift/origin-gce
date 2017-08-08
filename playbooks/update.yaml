@@ -11,4 +11,4 @@
 
 # TODO: make this parameterizeable? That would make this a dynamic playbook, which has consequences for
 #   syntax checking.
-- include: /usr/share/ansible/openshift-ansible/playbooks/byo/openshift-cluster/upgrades/v3_4/upgrade.yml
+- include: /usr/share/ansible/openshift-ansible/playbooks/byo/openshift-cluster/upgrades/v3_6/upgrade.yml
