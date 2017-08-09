@@ -17,6 +17,17 @@
   roles:
     - openshift-volume-quota
 
+# 3.7 requires std_include in order to invoke os_firewall (for now). Conditionally include it so
+# we don't break for older versions. Should be removed when os_firewall becomes a module.
+- hosts: localhost
+  tasks:
+    - stat: path=/usr/share/ansible/openshift-ansible/playbooks/common/openshift-cluster/std_include.yml
+      register: std_include
+      become: no
+- include: /usr/share/ansible/openshift-ansible/playbooks/byo/openshift-cluster/initialize_groups.yml
+- include: /usr/share/ansible/openshift-ansible/playbooks/common/openshift-cluster/std_include.yml
+  when: hostvars['localhost']['std_include'].stat.exists
+
 - hosts: masters
   gather_facts: no
   roles:
