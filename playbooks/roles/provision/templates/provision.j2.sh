@@ -86,8 +86,6 @@ declare -A FW_RULES=(
   ['infra-node-internal']="--allow tcp:5000 --source-tags ocp --target-tags ocp-infra-node"
   ['infra-node-external']="--allow tcp:80,tcp:443,tcp:1936${range} --target-tags ocp-infra-node"
 )
-
-# Create firewall rules
 for rule in "${!FW_RULES[@]}"; do
     ( if ! gcloud --project "{{ gce_project_id }}" compute firewall-rules describe "{{ provision_prefix }}$rule" &>/dev/null; then
         gcloud --project "{{ gce_project_id }}" compute firewall-rules create "{{ provision_prefix }}$rule" --network "{{ gce_network_name }}" ${FW_RULES[$rule]}
@@ -96,13 +94,13 @@ for rule in "${!FW_RULES[@]}"; do
     fi ) &
 done
 
+
 # Master IP
 ( if ! gcloud --project "{{ gce_project_id }}" compute addresses describe "{{ provision_prefix }}master-ssl-lb-ip" --global &>/dev/null; then
     gcloud --project "{{ gce_project_id }}" compute addresses create "{{ provision_prefix }}master-ssl-lb-ip" --global
 else
     echo "IP '{{ provision_prefix }}master-ssl-lb-ip' already exists"
 fi ) &
-
 
 # Internal master IP
 ( if ! gcloud --project "{{ gce_project_id }}" compute addresses describe "{{ provision_prefix }}master-network-lb-ip" --region "{{ gce_region_name }}" &>/dev/null; then
@@ -118,116 +116,54 @@ else
     echo "IP '{{ provision_prefix }}router-network-lb-ip' already exists"
 fi ) &
 
-for i in `jobs -p`; do wait $i; done
 
-# Create instance templates
+{% for node_group in provision_gce_node_groups %}
+# configure {{ node_group.name }}
 (
-if ! gcloud --project "{{ gce_project_id }}" compute instance-templates describe "{{ provision_prefix }}instance-template-master" &>/dev/null; then
-    gcloud --project "{{ gce_project_id }}" compute instance-templates create "{{ provision_prefix }}instance-template-master" --machine-type "{{ provision_gce_machine_type_master }}" --network "{{ gce_network_name }}" --tags "{{ provision_prefix }}ocp,ocp,ocp-master{{ gce_extra_tags_master }}" --image "${image}" --boot-disk-size "35" --boot-disk-type "pd-ssd" --scopes logging-write,monitoring-write,useraccounts-ro,service-control,service-management,storage-ro,compute-rw ${metadata}
-else
-    echo "Instance template '{{ provision_prefix }}instance-template-master' already exists"
-fi
-
-# Create Master instance group
-if ! gcloud --project "{{ gce_project_id }}" compute instance-groups managed describe "{{ provision_prefix }}ig-m" --zone "{{ gce_zone_name }}" &>/dev/null; then
-    gcloud --project "{{ gce_project_id }}" compute instance-groups managed create "{{ provision_prefix }}ig-m" --zone "{{ gce_zone_name }}" --template "{{ provision_prefix }}instance-template-master" --size "{{ provision_gce_instance_group_size_master }}"
-    gcloud --project "{{ gce_project_id }}" compute instance-groups managed set-named-ports "{{ provision_prefix }}ig-m" --zone "{{ gce_zone_name }}" --named-ports "{{ provision_prefix }}-port-name-master:{{ internal_console_port }}"
-else
-    echo "Instance group '{{ provision_prefix }}ig-m' already exists"
-fi
-) &
-
-(
-if ! gcloud --project "{{ gce_project_id }}" compute instance-templates describe "{{ provision_prefix }}instance-template-node" &>/dev/null; then
-    gcloud --project "{{ gce_project_id }}" compute instance-templates create "{{ provision_prefix }}instance-template-node" --machine-type "{{ provision_gce_machine_type_node }}" --network "{{ gce_network_name }}" --tags "{{ provision_prefix }}ocp,ocp,ocp-node{{ gce_extra_tags_node }}" --image "${image}" --boot-disk-size "25" --boot-disk-type "pd-ssd" --scopes logging-write,monitoring-write,useraccounts-ro,service-control,service-management,storage-ro,compute-rw ${metadata}
-else
-    echo "Instance template '{{ provision_prefix }}instance-template-node' already exists"
-fi
-
-# Create Node instance group
-if ! gcloud --project "{{ gce_project_id }}" compute instance-groups managed describe "{{ provision_prefix }}ig-n" --zone "{{ gce_zone_name }}" &>/dev/null; then
-    gcloud --project "{{ gce_project_id }}" compute instance-groups managed create "{{ provision_prefix }}ig-n" --zone "{{ gce_zone_name }}" --template "{{ provision_prefix }}instance-template-node" --size "{{ provision_gce_instance_group_size_node }}"
-else
-    echo "Instance group '{{ provision_prefix }}ig-n' already exists"
-fi
-) &
-
-(
-if ! gcloud --project "{{ gce_project_id }}" compute instance-templates describe "{{ provision_prefix }}instance-template-node-infra" &>/dev/null; then
-    gcloud --project "{{ gce_project_id }}" compute instance-templates create "{{ provision_prefix }}instance-template-node-infra" --machine-type "{{ provision_gce_machine_type_node_infra }}" --network "{{ gce_network_name }}" --tags "{{ provision_prefix }}ocp,ocp,ocp-infra-node{{ gce_extra_tags_node_infra }}" --image "${image}" --boot-disk-size "25" --boot-disk-type "pd-ssd" --scopes logging-write,monitoring-write,useraccounts-ro,service-control,service-management,storage-rw,compute-rw ${metadata}
-else
-    echo "Instance template '{{ provision_prefix }}instance-template-node-infra' already exists"
-fi
-
-# Create Infra node instance group
-if ! gcloud --project "{{ gce_project_id }}" compute instance-groups managed describe "{{ provision_prefix }}ig-i" --zone "{{ gce_zone_name }}" &>/dev/null; then
-        gcloud --project "{{ gce_project_id }}" compute instance-groups managed create "{{ provision_prefix }}ig-i" --zone "{{ gce_zone_name }}" --template "{{ provision_prefix }}instance-template-node-infra" --size "{{ provision_gce_instance_group_size_node_infra }}"
-else
-    echo "Instance group '{{ provision_prefix }}ig-i' already exists"
-fi
-) &
-
-for i in `jobs -p`; do wait $i; done
-
-# Make attach idempotent and reentrant
-function try_attach_disk() {
-    if ! out=$( gcloud --project "{{ gce_project_id }}" compute instances attach-disk "$1" --disk "$2" --zone "$3" 2>&1 ); then
-        if [[ "${out}" == *"is already being used by"* ]]; then
-            echo "Disk '$2' already attached"
-            return 0
-        fi
-        echo "${out}" 1>&2
-        return 1
-    fi
-    # TODO: identify whether we should turn on auto-delete
-    # gcloud --project "{{ gce_project_id }}" compute instances set-disk-auto-delete "$1" --disk "$2" --zone "$3" --auto-delete
-}
-
-# Attach additional disks to instances for docker storage
-# TODO: do we actually want multiple disks?make
-instances=$(gcloud --project "{{ gce_project_id }}" compute instances list --filter='tags.items:{{ provision_prefix }}ocp AND tags.items:ocp' --format='value(name)')
-for i in $instances; do
-    (
-    instance_zone=$(gcloud --project "{{ gce_project_id }}" compute instances list --filter="name:${i}" --format='value(zone)')
-    docker_disk="${i}-docker"
-    if ! gcloud --project "{{ gce_project_id }}" compute disks describe "$docker_disk" --zone "$instance_zone" &>/dev/null; then
-        gcloud --project "{{ gce_project_id }}" compute disks create "$docker_disk" --zone "$instance_zone" --size "{{ provision_gce_disk_size_node_docker }}" --type "pd-ssd"
+    if ! gcloud --project "{{ gce_project_id }}" compute instance-templates describe "{{ provision_prefix }}instance-template-{{ node_group.name }}" &>/dev/null; then
+        gcloud --project "{{ gce_project_id }}" compute instance-templates create "{{ provision_prefix }}instance-template-{{ node_group.name }}" \
+                --machine-type "{{ node_group.machine_type }}" --network "{{ gce_network_name }}" \
+                --tags "{{ provision_prefix }}ocp,ocp,{{ node_group.tags }}" \
+                --boot-disk-size "{{ node_group.boot_disk_size }}" --boot-disk-type "pd-ssd" \
+                --scopes "logging-write,monitoring-write,useraccounts-ro,service-control,service-management,storage-ro,compute-rw" \
+                --image "${image}" ${metadata}
     else
-        echo "Disk '${docker_disk}' already exists"
+        echo "Instance template '{{ provision_prefix }}instance-template-{{ node_group.name }}' already exists"
     fi
-    openshift_disk="${i}-openshift"
-    if ! gcloud --project "{{ gce_project_id }}" compute disks describe "$openshift_disk" --zone "$instance_zone" &>/dev/null; then
-        gcloud --project "{{ gce_project_id }}" compute disks create "$openshift_disk" --zone "$instance_zone" --size "{{ provision_gce_disk_size_node_openshift }}" --type "pd-ssd"
+
+    # Create instance group
+    if ! gcloud --project "{{ gce_project_id }}" compute instance-groups managed describe "{{ provision_prefix }}ig-{{ node_group.suffix }}" --zone "{{ gce_zone_name }}" &>/dev/null; then
+        gcloud --project "{{ gce_project_id }}" compute instance-groups managed create "{{ provision_prefix }}ig-{{ node_group.suffix }}" \
+                --zone "{{ gce_zone_name }}" --template "{{ provision_prefix }}instance-template-{{ node_group.name }}" --size "{{ node_group.scale }}"
     else
-        echo "Disk '${openshift_disk}' already exists"
+        echo "Instance group '{{ provision_prefix }}ig-{{ node_group.suffix }}' already exists"
     fi
-    try_attach_disk "${i}" "${docker_disk}" "${instance_zone}"
-    try_attach_disk "${i}" "${openshift_disk}" "${instance_zone}"
-    ) &
-done
+) &
+{% endfor %}
 
 for i in `jobs -p`; do wait $i; done
 
+
+# Configure the master external LB rules
+(
 # Master health check
-(
 if ! gcloud --project "{{ gce_project_id }}" compute health-checks describe "{{ provision_prefix }}master-ssl-lb-health-check" &>/dev/null; then
     gcloud --project "{{ gce_project_id }}" compute health-checks create https "{{ provision_prefix }}master-ssl-lb-health-check" --port "{{ internal_console_port }}" --request-path "/healthz"
 else
     echo "Health check '{{ provision_prefix }}master-ssl-lb-health-check' already exists"
 fi
 
+gcloud --project "{{ gce_project_id }}" compute instance-groups managed set-named-ports "{{ provision_prefix }}ig-m" \
+        --zone "{{ gce_zone_name }}" --named-ports "{{ provision_prefix }}port-name-master:{{ internal_console_port }}"
+
 # Master backend service
 if ! gcloud --project "{{ gce_project_id }}" compute backend-services describe "{{ provision_prefix }}master-ssl-lb-backend" --global &>/dev/null; then
-    gcloud --project "{{ gce_project_id }}" compute backend-services create "{{ provision_prefix }}master-ssl-lb-backend" --health-checks "{{ provision_prefix }}master-ssl-lb-health-check" --port-name "{{ provision_prefix }}-port-name-master" --protocol "TCP" --global --timeout="{{ provision_gce_master_https_timeout | default('2m') }}"
+    gcloud --project "{{ gce_project_id }}" compute backend-services create "{{ provision_prefix }}master-ssl-lb-backend" --health-checks "{{ provision_prefix }}master-ssl-lb-health-check" --port-name "{{ provision_prefix }}port-name-master" --protocol "TCP" --global --timeout="{{ provision_gce_master_https_timeout | default('2m') }}"
     gcloud --project "{{ gce_project_id }}" compute backend-services add-backend "{{ provision_prefix }}master-ssl-lb-backend" --instance-group "{{ provision_prefix }}ig-m" --global --instance-group-zone "{{ gce_zone_name }}"
 else
     echo "Backend service '{{ provision_prefix }}master-ssl-lb-backend' already exists"
 fi
-) &
 
-for i in `jobs -p`; do wait $i; done
-
-(
 # Master tcp proxy target
 if ! gcloud --project "{{ gce_project_id }}" compute target-tcp-proxies describe "{{ provision_prefix }}master-ssl-lb-target" &>/dev/null; then
     gcloud --project "{{ gce_project_id }}" compute target-tcp-proxies create "{{ provision_prefix }}master-ssl-lb-target" --backend-service "{{ provision_prefix }}master-ssl-lb-backend"
@@ -244,6 +180,8 @@ else
 fi
 ) &
 
+
+# Configure the master internal LB rules
 (
 # Internal master health check
 if ! gcloud --project "{{ gce_project_id }}" compute http-health-checks describe "{{ provision_prefix }}master-network-lb-health-check" &>/dev/null; then
@@ -268,6 +206,8 @@ else
 fi
 ) &
 
+
+# Configure the infra node rules
 (
 # Router health check
 if ! gcloud --project "{{ gce_project_id }}" compute http-health-checks describe "{{ provision_prefix }}router-network-lb-health-check" &>/dev/null; then
@@ -295,13 +235,17 @@ fi
 for i in `jobs -p`; do wait $i; done
 
 # set the target pools
+(
 if [[ "ig-m" == "{{ provision_gce_router_network_instance_group }}" ]]; then
     gcloud --project "{{ gce_project_id }}" compute instance-groups managed set-target-pools "{{ provision_prefix }}ig-m" --target-pools "{{ provision_prefix }}master-network-lb-pool,{{ provision_prefix }}router-network-lb-pool" --zone "{{ gce_zone_name }}"
 else
     gcloud --project "{{ gce_project_id }}" compute instance-groups managed set-target-pools "{{ provision_prefix }}ig-m" --target-pools "{{ provision_prefix }}master-network-lb-pool" --zone "{{ gce_zone_name }}"
     gcloud --project "{{ gce_project_id }}" compute instance-groups managed set-target-pools "{{ provision_prefix }}{{ provision_gce_router_network_instance_group }}" --target-pools "{{ provision_prefix }}router-network-lb-pool" --zone "{{ gce_zone_name }}"
 fi
+) &
 
+# configure DNS
+(
 # Retry DNS changes until they succeed since this may be a shared resource
 while true; do
     dns="${TMPDIR:-/tmp}/dns.yaml"
@@ -353,27 +297,15 @@ while true; do
     fi
     break
 done
+) &
 
 # Create bucket for registry
-( if ! gsutil ls -p "{{ gce_project_id }}" "gs://{{ openshift_hosted_registry_storage_gcs_bucket }}" &>/dev/null; then
+( 
+if ! gsutil ls -p "{{ gce_project_id }}" "gs://{{ openshift_hosted_registry_storage_gcs_bucket }}" &>/dev/null; then
     gsutil mb -p "{{ gce_project_id }}" -l "{{ gce_region_name }}" "gs://{{ openshift_hosted_registry_storage_gcs_bucket }}"
 else
     echo "Bucket '{{ openshift_hosted_registry_storage_gcs_bucket }}' already exists"
-fi ) &
+fi 
+) &
 
 for i in `jobs -p`; do wait $i; done
-
-
-# Wait for any remaining disks to be attached
-done=
-for i in `seq 1 60`; do
-    if [[ -z "$( gcloud --project "{{ gce_project_id }}" compute operations list --zones "{{ gce_zone_name }}" --filter 'operationType=attachDisk AND NOT status=DONE AND targetLink : "{{ provision_prefix }}ig-"' --page-size=10 --format 'value(targetLink)' --limit 1 )" ]]; then
-        done=1
-        break
-    fi
-    sleep 2
-done
-if [[ -z "${done}" ]]; then
-    echo "Failed to attach disks"
-    exit 1
-fi
