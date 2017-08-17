@@ -104,8 +104,7 @@ teardown "{{ provision_prefix }}master-network-lb-ip" compute addresses --region
 (
 # Master SSL network rules
 teardown "{{ provision_prefix }}master-ssl-lb-rule" compute forwarding-rules --global
-teardown "{{ provision_prefix }}master-ssl-lb-target" compute target-ssl-proxies
-teardown "{{ provision_prefix }}master-ssl-lb-cert" compute ssl-certificates
+teardown "{{ provision_prefix }}master-ssl-lb-target" compute target-tcp-proxies
 teardown "{{ provision_prefix }}master-ssl-lb-ip" compute addresses --global
 teardown "{{ provision_prefix }}master-ssl-lb-backend" compute backend-services --global
 teardown "{{ provision_prefix }}master-ssl-lb-health-check" compute health-checks

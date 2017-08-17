@@ -218,37 +218,19 @@ fi
 
 # Master backend service
 if ! gcloud --project "{{ gce_project_id }}" compute backend-services describe "{{ provision_prefix }}master-ssl-lb-backend" --global &>/dev/null; then
-    gcloud --project "{{ gce_project_id }}" compute backend-services create "{{ provision_prefix }}master-ssl-lb-backend" --health-checks "{{ provision_prefix }}master-ssl-lb-health-check" --port-name "{{ provision_prefix }}-port-name-master" --protocol "SSL" --global --timeout="{{ provision_gce_master_https_timeout | default('2m') }}"
+    gcloud --project "{{ gce_project_id }}" compute backend-services create "{{ provision_prefix }}master-ssl-lb-backend" --health-checks "{{ provision_prefix }}master-ssl-lb-health-check" --port-name "{{ provision_prefix }}-port-name-master" --protocol "TCP" --global --timeout="{{ provision_gce_master_https_timeout | default('2m') }}"
     gcloud --project "{{ gce_project_id }}" compute backend-services add-backend "{{ provision_prefix }}master-ssl-lb-backend" --instance-group "{{ provision_prefix }}ig-m" --global --instance-group-zone "{{ gce_zone_name }}"
 else
     echo "Backend service '{{ provision_prefix }}master-ssl-lb-backend' already exists"
 fi
 ) &
 
-# Master Certificate
-( if ! gcloud --project "{{ gce_project_id }}" compute ssl-certificates describe "{{ provision_prefix }}master-ssl-lb-cert" &>/dev/null; then
-    if [ -z "{{ provision_master_https_key_file }}" ] || [ -z "{{ provision_master_https_cert_file }}" ]; then
-        KEY='/tmp/ocp-ssl.key'
-        CERT='/tmp/ocp-ssl.crt'
-        openssl req -x509 -nodes -days 3650 -newkey rsa:2048 -subj "/C=US/L=Raleigh/O={{ public_hosted_zone }}/CN={{ openshift_master_cluster_public_hostname }}" -keyout "$KEY" -out "$CERT"
-    else
-        KEY="{{ provision_master_https_key_file }}"
-        CERT="{{ provision_master_https_cert_file }}"
-    fi
-    gcloud --project "{{ gce_project_id }}" compute ssl-certificates create "{{ provision_prefix }}master-ssl-lb-cert" --private-key "$KEY" --certificate "$CERT"
-    if [ -z "{{ provision_master_https_key_file }}" ] || [ -z "{{ provision_master_https_cert_file }}" ]; then
-        rm -fv "$KEY" "$CERT"
-    fi
-else
-    echo "Certificate '{{ provision_prefix }}master-ssl-lb-cert' already exists"
-fi ) &
-
 for i in `jobs -p`; do wait $i; done
 
 (
-# Master ssl proxy target
-if ! gcloud --project "{{ gce_project_id }}" compute target-ssl-proxies describe "{{ provision_prefix }}master-ssl-lb-target" &>/dev/null; then
-    gcloud --project "{{ gce_project_id }}" compute target-ssl-proxies create "{{ provision_prefix }}master-ssl-lb-target" --backend-service "{{ provision_prefix }}master-ssl-lb-backend" --ssl-certificate "{{ provision_prefix }}master-ssl-lb-cert"
+# Master tcp proxy target
+if ! gcloud --project "{{ gce_project_id }}" compute target-tcp-proxies describe "{{ provision_prefix }}master-ssl-lb-target" &>/dev/null; then
+    gcloud --project "{{ gce_project_id }}" compute target-tcp-proxies create "{{ provision_prefix }}master-ssl-lb-target" --backend-service "{{ provision_prefix }}master-ssl-lb-backend"
 else
     echo "Proxy target '{{ provision_prefix }}master-ssl-lb-target' already exists"
 fi
@@ -256,7 +238,7 @@ fi
 # Master forwarding rule
 if ! gcloud --project "{{ gce_project_id }}" compute forwarding-rules describe "{{ provision_prefix }}master-ssl-lb-rule" --global &>/dev/null; then
     IP=$(gcloud --project "{{ gce_project_id }}" compute addresses describe "{{ provision_prefix }}master-ssl-lb-ip" --global --format='value(address)')
-    gcloud --project "{{ gce_project_id }}" compute forwarding-rules create "{{ provision_prefix }}master-ssl-lb-rule" --address "$IP" --global --ports "{{ console_port }}" --target-ssl-proxy "{{ provision_prefix }}master-ssl-lb-target"
+    gcloud --project "{{ gce_project_id }}" compute forwarding-rules create "{{ provision_prefix }}master-ssl-lb-rule" --address "$IP" --global --ports "{{ console_port }}" --target-tcp-proxy "{{ provision_prefix }}master-ssl-lb-target"
 else
     echo "Forwarding rule '{{ provision_prefix }}master-ssl-lb-rule' already exists"
 fi
