@@ -2,12 +2,7 @@
 
 set -euo pipefail
 
-# Bucket for registry
-if gsutil ls -p "{{ gce_project_id }}" "gs://{{ provision_gce_registry_gcs_bucket }}" &>/dev/null; then
-    gsutil -m rm -r "gs://{{ provision_gce_registry_gcs_bucket }}"
-fi
-
-function teardown() {
+function teardown_cmd() {
     a=( $@ )
     local name=$1
     a=( "${a[@]:1}" )
@@ -27,6 +22,21 @@ function teardown() {
         gcloud --project "{{ gce_project_id }}" ${a[@]::$flag} delete -q "${name}" ${a[@]:$flag}
     fi
 }
+
+function teardown() {
+    for i in `seq 1 3`; do
+        if teardown_cmd $@; then
+            break
+        fi
+    done
+}
+
+# Bucket for registry
+(
+if gsutil ls -p "{{ gce_project_id }}" "gs://{{ openshift_hosted_registry_storage_gcs_bucket }}" &>/dev/null; then
+    gsutil -m rm -r "gs://{{ openshift_hosted_registry_storage_gcs_bucket }}"
+fi
+) &
 
 # DNS
 dns_zone="{{ dns_managed_zone | default(provision_prefix + 'managed-zone') }}"
