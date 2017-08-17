@@ -69,7 +69,6 @@
 - hosts: primary_master
   gather_facts: no
   roles:
-    - openshift-registry
     - openshift-roles
 
 - hosts: masters

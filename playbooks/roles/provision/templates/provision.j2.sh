@@ -373,10 +373,10 @@ while true; do
 done
 
 # Create bucket for registry
-( if ! gsutil ls -p "{{ gce_project_id }}" "gs://{{ provision_gce_registry_gcs_bucket }}" &>/dev/null; then
-    gsutil mb -p "{{ gce_project_id }}" -l "{{ gce_region_name }}" "gs://{{ provision_gce_registry_gcs_bucket }}"
+( if ! gsutil ls -p "{{ gce_project_id }}" "gs://{{ openshift_hosted_registry_storage_gcs_bucket }}" &>/dev/null; then
+    gsutil mb -p "{{ gce_project_id }}" -l "{{ gce_region_name }}" "gs://{{ openshift_hosted_registry_storage_gcs_bucket }}"
 else
-    echo "Bucket '{{ provision_gce_registry_gcs_bucket }}' already exists"
+    echo "Bucket '{{ openshift_hosted_registry_storage_gcs_bucket }}' already exists"
 fi ) &
 
 for i in `jobs -p`; do wait $i; done
