@@ -1,1 +1,1 @@
-../../roles/cluster-variables/vars/main.yaml
+../../roles/gce-cluster-variables/vars/main.yaml

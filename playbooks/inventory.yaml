@@ -3,4 +3,4 @@
   connection: local
   gather_facts: no
   roles:
-    - dynamic-inventory
+    - gce-dynamic-inventory

@@ -5,8 +5,8 @@
   connection: local
   gather_facts: no
   roles:
-    - provision
-    - dynamic-inventory
+    - gce-provision
+    - gce-dynamic-inventory
 
 - hosts: localhost
   tasks:
