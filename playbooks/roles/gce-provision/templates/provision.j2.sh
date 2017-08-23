@@ -308,4 +308,11 @@ else
 fi 
 ) &
 
+# wait until all node groups are stable
+{% for node_group in provision_gce_node_groups %}
+# wait for stable {{ node_group.name }}
+( gcloud --project "{{ gce_project_id }}" compute instance-groups managed wait-until-stable "{{ provision_prefix }}ig-{{ node_group.suffix }}" --zone "{{ gce_zone_name }}" --timeout=300) &
+{% endfor %}
+
+
 for i in `jobs -p`; do wait $i; done
