@@ -3,19 +3,14 @@
 - hosts: localhost
   connection: local
   roles:
-    - instance-groups
+    - gce-instance-groups
 
 - hosts: cluster_hosts
   roles:
-    - cluster-variables
-    - docker-storage-setup
+    - gce-cluster-variables
+    - gce-docker-storage-setup
     - gce-cloudconfig
     - frequent-log-rotation
-
-- hosts: schedulable_nodes
-  gather_facts: no
-  roles:
-    - openshift-volume-quota
 
 # 3.7 requires std_include in order to invoke os_firewall (for now). Conditionally include it so
 # we don't break for older versions. Should be removed when os_firewall becomes a module.
@@ -48,6 +43,24 @@
         dest: "/tmp/"
         flat: yes
 
+- hosts: primary_master
+  gather_facts: no
+  roles:
+    - openshift-roles
+    - master-validate
+
+- hosts: localhost
+  tasks:
+    - name: Validate the public address from outside the cluster
+      uri:
+        url: "https://{{ openshift_master_cluster_public_hostname }}:{{ console_port }}/healthz/ready"
+        validate_certs: False
+        method: GET
+      register: resp
+      until: resp.status == 200
+      retries: 6
+      delay: 5
+
 - hosts: infra_nodes
   gather_facts: no
   roles:
@@ -59,24 +72,5 @@
 - hosts: app_nodes
   gather_facts: no
   roles:
-    - restrict-gce-metadata
-
-- hosts: schedulable_nodes
-  gather_facts: no
-  roles:
-    - openshift-emptydir-quota
-
-- hosts: primary_master
-  gather_facts: no
-  roles:
-    - openshift-registry
-    - openshift-roles
-
-- hosts: masters
-  gather_facts: no
-  roles:
-    - validate-masters
-
-- hosts: localhost
-  roles:
-    - validate-public
+    - gce-node-restrict-metadata
+    - node-emptydir-quota

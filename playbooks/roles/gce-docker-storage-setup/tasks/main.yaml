@@ -2,4 +2,4 @@
 - name: create the docker-storage-setup config file
   template: src=docker-storage-setup.j2 dest=/etc/sysconfig/docker-storage-setup owner=root group=root mode=0644
 - name: start docker
-  service: name=docker state=started
+  service: name=docker state=restarted

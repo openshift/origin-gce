@@ -4,4 +4,4 @@
   hosts: localhost
   connection: local
   roles:
-    - deprovision
+    - gce-provision-remove

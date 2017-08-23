@@ -3,12 +3,12 @@
 - hosts: localhost
   connection: local
   roles:
-    - instance-groups
+    - gce-instance-groups
 
 - hosts: cluster_hosts
   roles:
-  - cluster-variables
+    - gce-cluster-variables
 
 # TODO: make this parameterizeable? That would make this a dynamic playbook, which has consequences for
 #   syntax checking.
-- include: /usr/share/ansible/openshift-ansible/playbooks/byo/openshift-cluster/upgrades/v3_6/upgrade.yml
+- include: /usr/share/ansible/openshift-ansible/playbooks/byo/openshift-cluster/upgrades/v3_7/upgrade.yml

@@ -74,16 +74,10 @@
         state: present
       when: ansible_os_family == "RedHat"
 
-# GCE instances are starting with xfs AND barrier=1, which is only for extfs.
-- name: Verify fstab entries are correct for XFS volumes
-  hosts: build_instance_ips
-  tasks:
-  - name: Remove barrier=1 from XFS fstab entries
-    command: sed -i -e 's/xfs\(.*\)barrier=1/xfs\1/g; s/, / /g' /etc/fstab
-
 - name: Build image
   hosts: build_instance_ips
   roles:
+    - role: gce-image-configure
     - role: os_update_latest
   post_tasks:
     - name: Disable all repos on RHEL
@@ -111,12 +105,6 @@
       args:
         warn: no
       when: ansible_os_family == "RedHat"
-
-#- name: Install and configure image
-#  hosts: build_instance_ips
-#  tasks:
-#    #- yum: name=* state=latest update_cache=yes
-#    #  when: ansible_os_family == "RedHat"
 
 - name: Commit image
   hosts: localhost
