@@ -31,6 +31,16 @@ function teardown() {
     done
 }
 
+# Preemptively spin down the instances
+{% for node_group in provision_gce_node_groups %}
+# scale down {{ node_group.name }}
+(
+if gcloud --project "{{ gce_project_id }}" compute instance-groups managed describe "{{ provision_prefix }}ig-{{ node_group.suffix }}" &>/dev/null; then
+    gcloud --project "{{ gce_project_id }}" compute instance-groups managed resize "{{ provision_prefix }}ig-{{ node_group.suffix }}" --size=0 --zone "{{ gce_zone_name }}"
+fi
+) &
+{% endfor %}
+
 # Bucket for registry
 (
 if gsutil ls -p "{{ gce_project_id }}" "gs://{{ openshift_hosted_registry_storage_gcs_bucket }}" &>/dev/null; then
@@ -69,23 +79,6 @@ if gcloud --project "{{ gce_project_id }}" dns managed-zones describe "${dns_zon
         rm "${dns}.input"
         break
     done
-fi
-) &
-
-# Preemptively spin down the instances
-(
-if gcloud --project "{{ gce_project_id }}" compute instance-groups managed describe "{{ provision_prefix }}ig-m" &>/dev/null; then
-    gcloud --project "{{ gce_project_id }}" compute instance-groups managed resize "{{ provision_prefix }}ig-m" --size=0 --zone "{{ gce_zone_name }}"
-fi
-) &
-(
-if gcloud --project "{{ gce_project_id }}" compute instance-groups managed describe "{{ provision_prefix }}ig-i" &>/dev/null; then
-    gcloud --project "{{ gce_project_id }}" compute instance-groups managed resize "{{ provision_prefix }}ig-i" --size=0 --zone "{{ gce_zone_name }}"
-fi
-) &
-(
-if gcloud --project "{{ gce_project_id }}" compute instance-groups managed describe "{{ provision_prefix }}ig-n" &>/dev/null; then
-    gcloud --project "{{ gce_project_id }}" compute instance-groups managed resize "{{ provision_prefix }}ig-n" --size=0 --zone "{{ gce_zone_name }}"
 fi
 ) &
 
