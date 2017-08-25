@@ -35,9 +35,10 @@ function teardown() {
 {% for node_group in provision_gce_node_groups %}
 # scale down {{ node_group.name }}
 (
-if gcloud --project "{{ gce_project_id }}" compute instance-groups managed describe "{{ provision_prefix }}ig-{{ node_group.suffix }}" &>/dev/null; then
-    gcloud --project "{{ gce_project_id }}" compute instance-groups managed resize "{{ provision_prefix }}ig-{{ node_group.suffix }}" --size=0 --zone "{{ gce_zone_name }}"
-fi
+    # performs a delete and scale down as one operation to ensure maximum parallelism
+    if ! gcloud compute instance-groups managed delete-instances "{{ provision_prefix }}ig-{{ node_group.suffix }}" --zone "{{ gce_zone_name }}" --instances=$( gcloud compute instance-groups managed list-instances "{{ provision_prefix }}ig-{{ node_group.suffix }}" --zone "{{ gce_zone_name }}" --format='value[terminator=","](instance)' ); then
+        echo "warning: Unable to scale down the node group {{ node_group.name }}" 1>&2
+    fi
 ) &
 {% endfor %}
 
@@ -105,18 +106,6 @@ teardown "{{ provision_prefix }}master-ssl-lb-backend" compute backend-services 
 teardown "{{ provision_prefix }}master-ssl-lb-health-check" compute health-checks
 ) &
 
-for i in `jobs -p`; do wait $i; done
-
-{% for node_group in provision_gce_node_groups %}
-# teardown {{ node_group.name }}
-(
-    teardown "{{ provision_prefix }}ig-{{ node_group.suffix }}" compute instance-groups managed --zone "{{ gce_zone_name }}"
-    teardown "{{ provision_prefix }}instance-template-{{ node_group.name }}" compute instance-templates
-) &
-{% endfor %}
-
-for i in `jobs -p`; do wait $i; done
-
 #Firewall rules
 #['name']='parameters for "gcloud compute firewall-rules create"'
 #For all possible parameters see: gcloud compute firewall-rules create --help
@@ -143,5 +132,15 @@ done
 
 for i in `jobs -p`; do wait $i; done
 
+{% for node_group in provision_gce_node_groups %}
+# teardown {{ node_group.name }} - any load balancers referencing these groups must be removed
+(
+    teardown "{{ provision_prefix }}ig-{{ node_group.suffix }}" compute instance-groups managed --zone "{{ gce_zone_name }}"
+    teardown "{{ provision_prefix }}instance-template-{{ node_group.name }}" compute instance-templates
+) &
+{% endfor %}
+
 # Network
-teardown "{{ gce_network_name }}" compute networks
+( teardown "{{ gce_network_name }}" compute networks ) &
+
+for i in `jobs -p`; do wait $i; done
