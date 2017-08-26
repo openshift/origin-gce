@@ -24,10 +24,11 @@ function teardown_cmd() {
 }
 
 function teardown() {
-    for i in `seq 1 3`; do
+    for i in `seq 1 20`; do
         if teardown_cmd $@; then
             break
         fi
+        sleep 0.5
     done
 }
 
@@ -140,7 +141,7 @@ for i in `jobs -p`; do wait $i; done
 ) &
 {% endfor %}
 
-# Network
-( teardown "{{ gce_network_name }}" compute networks ) &
-
 for i in `jobs -p`; do wait $i; done
+
+# Network
+teardown "{{ gce_network_name }}" compute networks
