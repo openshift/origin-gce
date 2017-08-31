@@ -34,7 +34,7 @@ ENV WORK=/usr/share/ansible/openshift-ansible-gce \
 
 # meta refresh_inventory has a bug in 2.2.0 where it uses relative path
 # remove when fixed
-ENV ANSIBLE_INVENTORY=$WORK/inventory.sh
+ENV ANSIBLE_INVENTORY=$WORK/inventory/hosts
 
 # package atomic-openshift-utils missing
 RUN mkdir -p /usr/share/ansible $HOME/.ssh $WORK/playbooks/files && \
