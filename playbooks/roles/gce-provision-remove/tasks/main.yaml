@@ -1,6 +1,0 @@
----
-- name: Templatize de-provision script
-  template: src=provision-remove.j2.sh dest=/tmp/provision-remove.sh mode=u+rx
-
-- name: De-provision GCE resources
-  command: /tmp/provision-remove.sh

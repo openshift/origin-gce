@@ -3,5 +3,8 @@
 - name: Terminate running cluster and remove all supporting resources in GCE
   hosts: localhost
   connection: local
-  roles:
-    - gce-provision-remove
+  tasks:
+  - include_role:
+      name: gce-provision
+    vars:
+      state: absent

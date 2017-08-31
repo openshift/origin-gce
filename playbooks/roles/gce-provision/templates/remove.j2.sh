@@ -37,8 +37,17 @@ function teardown() {
 # scale down {{ node_group.name }}
 (
     # performs a delete and scale down as one operation to ensure maximum parallelism
-    if ! gcloud compute instance-groups managed delete-instances "{{ provision_prefix }}ig-{{ node_group.suffix }}" --zone "{{ gce_zone_name }}" --instances=$( gcloud compute instance-groups managed list-instances "{{ provision_prefix }}ig-{{ node_group.suffix }}" --zone "{{ gce_zone_name }}" --format='value[terminator=","](instance)' ); then
+    if ! instances=$( gcloud --project "{{ gce_project_id }}" compute instance-groups managed list-instances "{{ provision_prefix }}ig-{{ node_group.suffix }}" --zone "{{ gce_zone_name }}" --format='value[terminator=","](instance)' ); then
+        exit 0
+    fi
+    instances="${instances%?}"
+    if [[ -z "${instances}" ]]; then
+        echo "warning: No instances in {{ node_group.name }}" 1>&2
+        exit 0
+    fi
+    if ! gcloud --project "{{ gce_project_id }}" compute instance-groups managed delete-instances "{{ provision_prefix }}ig-{{ node_group.suffix }}" --zone "{{ gce_zone_name }}" --instances "${instances}"; then
         echo "warning: Unable to scale down the node group {{ node_group.name }}" 1>&2
+        exit 0
     fi
 ) &
 {% endfor %}
