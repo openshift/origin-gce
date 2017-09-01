@@ -7,7 +7,7 @@
 
 - hosts: cluster_hosts
   roles:
-    - gce-cluster-variables
+    #- gce-cluster-variables
     - gce-docker-storage-setup
     - gce-cloudconfig
     - frequent-log-rotation

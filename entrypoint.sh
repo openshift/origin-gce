@@ -12,8 +12,8 @@ export PATH=$HOME/google-cloud-sdk/bin:$PATH
 # sudo.
 if ! whoami &>/dev/null; then
   echo "cloud-user$(id -u):x:$(id -u):0:cloud-user:$HOME:/sbin/nologin" >> /etc/passwd
-  mkdir -p "${WORK}/playbooks/host_vars"
-  echo "ansible_become: no" >> "${WORK}/playbooks/host_vars/localhost"
+  mkdir -p "${WORK}/inventory/host_vars/localhost"
+  echo "ansible_become: no" > "${WORK}/inventory/host_vars/localhost/00_skip_root.yaml"
 
   # SSH requires the file to be owned by the current user, but Docker copies
   # files in as root. Remove the file and recreate it.
@@ -24,6 +24,9 @@ if ! whoami &>/dev/null; then
     chmod 0600 "${keyfile}"
   fi
 fi
+
+find "${WORK}/playbooks/files" | xargs -L1 -I {} ln -fs {} "${WORK}/inventory/"
+find "${WORK}/playbooks/files" -name *.yaml -or -name vars | xargs -L1 -I {} ln -fs {} "${WORK}/inventory/group_vars/all"
 
 if [[ -n "${OPENSHIFT_ANSIBLE_COMMIT-}" ]]; then
   pushd /usr/share/ansible/openshift-ansible &>/dev/null

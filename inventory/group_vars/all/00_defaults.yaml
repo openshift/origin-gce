@@ -19,15 +19,4 @@ openshift_master_default_subdomain: "{{ wildcard_zone }}"
 osm_default_node_selector: "role=app"
 openshift_deployment_type: origin 
 openshift_hosted_registry_storage_provider: gcs
-
 openshift_master_identity_providers:
-- name: google
-  kind: GoogleIdentityProvider
-  login: true
-  challenge: false
-  mapping_method: claim
-  clientID: xxx-yyy.apps.googleusercontent.com
-  clientSecret: zzz
-  hostedDomain: example.com
-osm_use_cockpit: false
-containerized: false
