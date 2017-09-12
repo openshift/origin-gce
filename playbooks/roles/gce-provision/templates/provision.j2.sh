@@ -76,13 +76,14 @@ range=""
 if [[ -n "{{ openshift_node_port_range }}" ]]; then
     range=",tcp:{{ openshift_node_port_range }},udp:{{ openshift_node_port_range }}"
 fi
+internal_range="{% for item in (openshift_node_open_ports|default([])) %},{{ item.port.split('/')[1] }}:{{ item.port.split('/')[0] }}{% endfor %}"
 declare -A FW_RULES=(
   ['icmp']='--allow icmp'
   ['ssh-external']='--allow tcp:22'
   ['ssh-internal']='--allow tcp:22 --source-tags bastion'
   ['master-internal']="--allow tcp:2224,tcp:2379,tcp:2380,tcp:4001,udp:4789,udp:5404,udp:5405,tcp:8053,udp:8053,tcp:8444,tcp:10250,tcp:10255,udp:10255,tcp:24224,udp:24224 --source-tags ocp --target-tags ocp-master"
   ['master-external']="--allow tcp:80,tcp:443,tcp:1936,tcp:8080,tcp:8443${range} --target-tags ocp-master"
-  ['node-internal']="--allow udp:4789,tcp:10250,tcp:10255,udp:10255 --source-tags ocp --target-tags ocp-node,ocp-infra-node"
+  ['node-internal']="--allow udp:4789,tcp:10250,tcp:10255,udp:10255${internal_range} --source-tags ocp --target-tags ocp-node,ocp-infra-node"
   ['infra-node-internal']="--allow tcp:5000 --source-tags ocp --target-tags ocp-infra-node"
   ['infra-node-external']="--allow tcp:80,tcp:443,tcp:1936${range} --target-tags ocp-infra-node"
 )
@@ -93,7 +94,6 @@ for rule in "${!FW_RULES[@]}"; do
         echo "Firewall rule '{{ provision_prefix }}${rule}' already exists"
     fi ) &
 done
-
 
 # Master IP
 ( if ! gcloud --project "{{ gce_project_id }}" compute addresses describe "{{ provision_prefix }}master-ssl-lb-ip" --global &>/dev/null; then
