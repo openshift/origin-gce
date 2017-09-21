@@ -8,6 +8,8 @@ openshift_master_access_token_max_seconds: 2419200
 openshift_master_api_port: "{{ console_port }}"
 openshift_master_console_port: "{{ console_port }}"
 osm_cluster_network_cidr: 172.16.0.0/16
+osm_host_subnet_length: 9
+openshift_portal_net: 172.30.0.0/16
 openshift_registry_selector: "role=infra"
 openshift_router_selector: "role=infra"
 openshift_hosted_router_replicas: 2
