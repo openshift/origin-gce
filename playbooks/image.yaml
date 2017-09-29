@@ -73,6 +73,25 @@
         repo_gpgcheck: yes
         state: present
       when: ansible_os_family == "RedHat"
+    - name: Add the jdetiber-qemu-user-static copr repo
+      yum_repository:
+        name: jdetiber-qemu-user-static
+        description: QEMU user static COPR
+        baseurl: https://copr-be.cloud.fedoraproject.org/results/jdetiber/qemu-user-static/epel-7-$basearch/
+        gpgkey: https://copr-be.cloud.fedoraproject.org/results/jdetiber/qemu-user-static/pubkey.gpg
+        gpgcheck: yes
+        repo_gpgcheck: no
+        state: present
+      when: ansible_os_family == "RedHat"
+    - name: Install qemu-user-static
+      package:
+        name: qemu-user-static
+        state: present
+    - name: Start and enable systemd-binfmt service
+      systemd:
+        name: systemd-binfmt
+        state: started
+        enabled: yes
 
 - name: Build image
   hosts: build_instance_ips

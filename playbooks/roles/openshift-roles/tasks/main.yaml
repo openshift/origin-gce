@@ -1,4 +1,9 @@
 ---
 - name: Assign roles to cluster users
   command: oadm policy add-cluster-role-to-user "{{ item.role }}" "{{ item.user }}"
+  when: "'user' in item"
+  with_items: "{{ provision_role_mappings | default([]) }}"
+- name: Assign roles to cluster groups
+  command: oadm policy add-cluster-role-to-group "{{ item.role }}" "{{ item.group }}"
+  when: "'group' in item"
   with_items: "{{ provision_role_mappings | default([]) }}"
