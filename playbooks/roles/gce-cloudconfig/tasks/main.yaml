@@ -5,8 +5,8 @@
 - name: configure gce cloud config options
   ini_file: dest=/etc/origin/cloudprovider/gce.conf section=Global option={{ item.key }} value={{ item.value }} state=present create=yes
   with_items:
-    - { key: 'project-id', value: '{{ gce_project_id }}' }
-    - { key: 'network-name', value: '{{ gce_network_name }}' }
-    - { key: 'node-tags', value: '{{ provision_prefix }}ocp' }
-    - { key: 'node-instance-prefix', value: '{{ provision_prefix }}' }
+    - { key: 'project-id', value: '{{ openshift_gcp_project }}' }
+    - { key: 'network-name', value: '{{ openshift_gcp_network_name }}' }
+    - { key: 'node-tags', value: '{{ openshift_gcp_prefix }}ocp' }
+    - { key: 'node-instance-prefix', value: '{{ openshift_gcp_prefix }}' }
     - { key: 'multizone', value: 'false' }

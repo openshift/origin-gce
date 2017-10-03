@@ -3,5 +3,5 @@
   connection: local
   gather_facts: no
   roles:
-    - gce-provision
+    - openshift_gcp
     - gce-dynamic-inventory
