@@ -1,5 +1,5 @@
 {% for repo in provision_custom_repositories %}
-[{{ repo.id }}]
+[{{ repo.id | default(repo.name) }}]
 name={{ repo.name | default(repo.id) }}
 baseurl={{ repo.baseurl }}
 {% set enable_repo = repo.enabled | default(1) %}
