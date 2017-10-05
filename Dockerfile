@@ -26,10 +26,12 @@ FROM openshift/origin-base
 LABEL io.k8s.display-name="OpenShift GCE Install Environment" \
       io.k8s.description="This image helps install OpenShift onto GCE."
 
+ARG OPENSHIFT_ANSIBLE_REPO=https://github.com/openshift/openshift-ansible.git
+ARG OPENSHIFT_ANSIBLE_TAG=master
+
 ENV WORK=/usr/share/ansible/openshift-ansible-gce \
     HOME=/home/cloud-user \
     GOOGLE_CLOUD_SDK_VERSION=147.0.0 \
-    OPENSHIFT_ANSIBLE_TAG=master \
     ANSIBLE_JUNIT_DIR=/tmp/openshift/ansible_junit
 
 # meta refresh_inventory has a bug in 2.2.0 where it uses relative path
@@ -50,7 +52,7 @@ RUN mkdir -p /usr/share/ansible $HOME/.ssh $WORK/playbooks/files && \
     yum install -y ansible && \
     yum clean all && \
     cd /usr/share/ansible && \
-    git clone https://github.com/openshift/openshift-ansible.git && \
+    git clone ${OPENSHIFT_ANSIBLE_REPO} && \
     cd openshift-ansible && \
     git checkout ${OPENSHIFT_ANSIBLE_TAG} && \
     cd $HOME && \

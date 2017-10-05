@@ -7,8 +7,8 @@
   tasks:
     - name: Create the image instance disk
       gce_pd:
-        service_account_email: "{{ (lookup('file', playbook_dir + '/files/' + gce_service_account_keyfile ) | from_json ).client_email }}"
-        credentials_file: "{{ playbook_dir + '/files/' + gce_service_account_keyfile }}"
+        service_account_email: "{{ (lookup('file', gce_service_account_keyfile ) | from_json ).client_email }}"
+        credentials_file: "{{ gce_service_account_keyfile }}"
         project_id: "{{ gce_project_id }}"
         zone: "{{ gce_zone_name }}"
         name: "{{ provision_prefix }}build-image-instance"
@@ -19,8 +19,8 @@
 
     - name: Launch the image build instance
       gce:
-        service_account_email: "{{ (lookup('file', playbook_dir + '/files/' + gce_service_account_keyfile ) | from_json ).client_email }}"
-        credentials_file: "{{ playbook_dir + '/files/' + gce_service_account_keyfile }}"
+        service_account_email: "{{ (lookup('file', gce_service_account_keyfile ) | from_json ).client_email }}"
+        credentials_file: "{{ gce_service_account_keyfile }}"
         project_id: "{{ gce_project_id }}"
         zone: "{{ gce_zone_name }}"
         machine_type: n1-standard-1
@@ -50,7 +50,7 @@
 - name: Prepare instance content sources
   pre_tasks:
   - set_fact:
-      allow_rhel_subscriptions: "{{ lookup('oo_option', 'rhel_skip_subscription') | default(rhsub_skip, True) | default('no', True) | lower in ['no', 'false'] }}"
+      allow_rhel_subscriptions: "{{ rhsub_skip | default('no', True) | lower in ['no', 'false'] }}"
   - set_fact:
       using_rhel_subscriptions: "{{ (deployment_type in ['enterprise', 'atomic-enterprise', 'openshift-enterprise'] or ansible_distribution == 'RedHat') and allow_rhel_subscriptions }}"
   hosts: build_instance_ips
@@ -73,6 +73,25 @@
         repo_gpgcheck: yes
         state: present
       when: ansible_os_family == "RedHat"
+    - name: Add the jdetiber-qemu-user-static copr repo
+      yum_repository:
+        name: jdetiber-qemu-user-static
+        description: QEMU user static COPR
+        baseurl: https://copr-be.cloud.fedoraproject.org/results/jdetiber/qemu-user-static/epel-7-$basearch/
+        gpgkey: https://copr-be.cloud.fedoraproject.org/results/jdetiber/qemu-user-static/pubkey.gpg
+        gpgcheck: yes
+        repo_gpgcheck: no
+        state: present
+      when: ansible_os_family == "RedHat"
+    - name: Install qemu-user-static
+      package:
+        name: qemu-user-static
+        state: present
+    - name: Start and enable systemd-binfmt service
+      systemd:
+        name: systemd-binfmt
+        state: started
+        enabled: yes
 
 - name: Build image
   hosts: build_instance_ips
@@ -112,8 +131,8 @@
   tasks:
     - name: Terminate the image build instance
       gce:
-        service_account_email: "{{ (lookup('file', playbook_dir + '/files/' + gce_service_account_keyfile ) | from_json ).client_email }}"
-        credentials_file: "{{ playbook_dir + '/files/' + gce_service_account_keyfile }}"
+        service_account_email: "{{ (lookup('file', gce_service_account_keyfile ) | from_json ).client_email }}"
+        credentials_file: "{{ gce_service_account_keyfile }}"
         project_id: "{{ gce_project_id }}"
         zone: "{{ gce_zone_name }}"
         instance_names: "{{ provision_prefix }}build-image-instance"
@@ -122,8 +141,8 @@
       command: gcloud --project "{{ gce_project_id}}" compute images create "{{ provision_gce_registered_image_id | default(provision_gce_registered_image + '-' + lookup('pipe','date +%Y%m%d-%H%M%S')) }}" --source-disk "{{ provision_prefix }}build-image-instance" --source-disk-zone "{{ gce_zone_name }}" --family "{{ provision_gce_registered_image }}"
     - name: Remove the image instance disk
       gce_pd:
-        service_account_email: "{{ (lookup('file', playbook_dir + '/files/' + gce_service_account_keyfile ) | from_json ).client_email }}"
-        credentials_file: "{{ playbook_dir + '/files/' + gce_service_account_keyfile }}"
+        service_account_email: "{{ (lookup('file', gce_service_account_keyfile ) | from_json ).client_email }}"
+        credentials_file: "{{ gce_service_account_keyfile }}"
         project_id: "{{ gce_project_id }}"
         zone: "{{ gce_zone_name }}"
         name: "{{ provision_prefix }}build-image-instance"
