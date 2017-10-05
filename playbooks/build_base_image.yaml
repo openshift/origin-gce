@@ -5,15 +5,20 @@
   connection: local
   gather_facts: no
   tasks:
+    - name: Require openshift_gcp_root_image
+      fail:
+        msg: "A root OS image name or family is required for base image building.  Please ensure `openshift_gcp_root_image` is defined."
+      when: openshift_gcp_root_image is undefined
+
     - name: Create the image instance disk
       gce_pd:
-        service_account_email: "{{ (lookup('file', gce_service_account_keyfile ) | from_json ).client_email }}"
-        credentials_file: "{{ gce_service_account_keyfile }}"
-        project_id: "{{ gce_project_id }}"
-        zone: "{{ gce_zone_name }}"
-        name: "{{ provision_prefix }}build-image-instance"
+        service_account_email: "{{ (lookup('file', openshift_gcp_iam_service_account_keyfile ) | from_json ).client_email }}"
+        credentials_file: "{{ openshift_gcp_iam_service_account_keyfile }}"
+        project_id: "{{ openshift_gcp_project }}"
+        zone: "{{ openshift_gcp_zone }}"
+        name: "{{ openshift_gcp_prefix }}build-image-instance"
         disk_type: pd-ssd
-        image: "{{ provision_gce_base_image | default('https://www.googleapis.com/compute/v1/projects/rhel-cloud/global/images/rhel-7-v20170110') }}"
+        image: "{{ openshift_gcp_root_image }}"
         size_gb: 10
         state: present
 
@@ -21,16 +26,16 @@
       gce:
         service_account_email: "{{ (lookup('file', gce_service_account_keyfile ) | from_json ).client_email }}"
         credentials_file: "{{ gce_service_account_keyfile }}"
-        project_id: "{{ gce_project_id }}"
-        zone: "{{ gce_zone_name }}"
+        project_id: "{{ openshift_gcp_project }}"
+        zone: "{{ openshift_gcp_zone }}"
         machine_type: n1-standard-1
-        instance_names: "{{ provision_prefix }}build-image-instance"
+        instance_names: "{{ openshift_gcp_prefix }}build-image-instance"
         state: present
         tags:
           - build-image-instance
         disk_auto_delete: false
         disks:
-          - "{{ provision_prefix }}build-image-instance"
+          - "{{ openshift_gcp_prefix }}build-image-instance"
       register: gce
 
     - add_host:
@@ -131,19 +136,19 @@
   tasks:
     - name: Terminate the image build instance
       gce:
-        service_account_email: "{{ (lookup('file', gce_service_account_keyfile ) | from_json ).client_email }}"
-        credentials_file: "{{ gce_service_account_keyfile }}"
-        project_id: "{{ gce_project_id }}"
-        zone: "{{ gce_zone_name }}"
-        instance_names: "{{ provision_prefix }}build-image-instance"
+        service_account_email: "{{ (lookup('file', openshift_gcp_iam_service_account_keyfile ) | from_json ).client_email }}"
+        credentials_file: "{{ openshift_gcp_iam_service_account_keyfile }}"
+        project_id: "{{ openshift_gcp_project }}"
+        zone: "{{ openshift_gcp_zone }}"
+        instance_names: "{{ openshift_gcp_prefix }}build-image-instance"
         state: absent
     - name: Save the new image
-      command: gcloud --project "{{ gce_project_id}}" compute images create "{{ provision_gce_registered_image_id | default(provision_gce_registered_image + '-' + lookup('pipe','date +%Y%m%d-%H%M%S')) }}" --source-disk "{{ provision_prefix }}build-image-instance" --source-disk-zone "{{ gce_zone_name }}" --family "{{ provision_gce_registered_image }}"
+      command: gcloud --project "{{ openshift_gcp_project}}" compute images create "{{ openshift_gcp_base_image_name | default(openshift_gcp_base_image + '-' + lookup('pipe','date +%Y%m%d-%H%M%S')) }}" --source-disk "{{ openshift_gcp_prefix }}build-image-instance" --source-disk-zone "{{ openshift_gcp_zone }}" --family "{{ openshift_gcp_base_image }}"
     - name: Remove the image instance disk
       gce_pd:
-        service_account_email: "{{ (lookup('file', gce_service_account_keyfile ) | from_json ).client_email }}"
-        credentials_file: "{{ gce_service_account_keyfile }}"
-        project_id: "{{ gce_project_id }}"
-        zone: "{{ gce_zone_name }}"
-        name: "{{ provision_prefix }}build-image-instance"
+        service_account_email: "{{ (lookup('file', openshift_gcp_iam_service_account_keyfile ) | from_json ).client_email }}"
+        credentials_file: "{{ openshift_gcp_iam_service_account_keyfile }}"
+        project_id: "{{ openshift_gcp_project }}"
+        zone: "{{ openshift_gcp_zone }}"
+        name: "{{ openshift_gcp_prefix }}build-image-instance"
         state: absent
