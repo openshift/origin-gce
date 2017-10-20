@@ -33,3 +33,10 @@
     openshift_node_labels:
       role: app
   with_items: "{{ groups['tag_ocp-node'] | default([])  }}"
+
+- name: Mark all bootstrap nodes with the right Ansible flag
+  set_fact:
+    openshift_node_bootstrap: True
+  delegate_to: "{{ hostvars[item].gce_name }}"
+  delegate_facts: True
+  with_items: "{{ groups['tag_ocp-bootstrap'] | default([])  }}"
