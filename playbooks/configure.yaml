@@ -5,9 +5,8 @@
   roles:
     - gce-instance-groups
 
-- hosts: cluster_hosts
+- hosts: nodes
   roles:
-    #- gce-cluster-variables
     - gce-docker-storage-setup
     - gce-cloudconfig
     - frequent-log-rotation
@@ -19,9 +18,8 @@
     - stat: path=/usr/share/ansible/openshift-ansible/playbooks/common/openshift-cluster/std_include.yml
       register: std_include
       become: no
-- include: /usr/share/ansible/openshift-ansible/playbooks/byo/openshift-cluster/initialize_groups.yml
-- include: /usr/share/ansible/openshift-ansible/playbooks/common/openshift-cluster/std_include.yml
-  when: hostvars['localhost']['std_include'].stat.exists
+- import_playbook: /usr/share/ansible/openshift-ansible/playbooks/byo/openshift-cluster/initialize_groups.yml
+- import_playbook: /usr/share/ansible/openshift-ansible/playbooks/common/openshift-cluster/std_include.yml
 
 - hosts: masters
   gather_facts: no
@@ -32,7 +30,7 @@
         - service: master http proxy
           port: 8080/tcp
 
-- include: /usr/share/ansible/openshift-ansible/playbooks/byo/config.yml
+- import_playbook: /usr/share/ansible/openshift-ansible/playbooks/byo/config.yml
 
 - hosts: primary_master
   gather_facts: no
@@ -42,6 +40,12 @@
         src: "{{ openshift.common.config_base }}/master/admin.kubeconfig"
         dest: "/tmp/"
         flat: yes
+
+- hosts: masters
+  gather_facts: no
+  roles:
+    - role: gce-master-bootstrap
+      when: openshift_master_bootstrap_enabled | default(False)
 
 - hosts: primary_master
   gather_facts: no
@@ -60,14 +64,6 @@
       until: resp.status == 200
       retries: 6
       delay: 5
-
-- hosts: infra_nodes
-  gather_facts: no
-  roles:
-    - role: /usr/share/ansible/openshift-ansible/roles/os_firewall
-      os_firewall_allow:
-        - service: router liveness probe
-          port: 1936/tcp
 
 - hosts: app_nodes
   gather_facts: no

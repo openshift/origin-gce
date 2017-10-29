@@ -2,41 +2,43 @@
 - name: Add masters to requisite groups
   add_host:
     name: "{{ hostvars[item].gce_name }}"
-    groups: masters, etcd, nodes, cluster_hosts, infra_nodes
-    openshift_node_labels:
-      role: infra
-      subrole: master
+    groups: masters, etcd
   with_items: "{{ groups['tag_ocp-master'] }}"
 
 - name: Add a master to the primary masters group
   add_host:
     name: "{{ hostvars[item].gce_name }}"
     groups: primary_master
-    openshift_node_labels:
-      role: infra
-      subrole: master
   with_items: "{{ groups['tag_ocp-master'].0 }}"
 
-- name: Add infra instances to host group
+- name: Add non-bootstrapping master node instances to node group
   add_host:
     name: "{{ hostvars[item].gce_name }}"
-    groups: nodes, cluster_hosts, schedulable_nodes, infra_nodes
+    groups: nodes
     openshift_node_labels:
       role: infra
-      subrole: worker
-  with_items: "{{ groups['tag_ocp-infra-node'] | default([]) }}"
+  with_items: "{{ groups['tag_ocp-master'] | default([]) | difference(groups['tag_ocp-bootstrap'] | default([])) }}"
 
-- name: Add app instances to host group
+- name: Add infra node instances to node group
   add_host:
     name: "{{ hostvars[item].gce_name }}"
-    groups: nodes, cluster_hosts, schedulable_nodes, app_nodes
+    groups: nodes
+    openshift_node_labels:
+      role: infra
+  with_items: "{{ groups['tag_ocp-infra-node'] | default([]) | difference(groups['tag_ocp-bootstrap'] | default([])) }}"
+
+- name: Add node instances to node group
+  add_host:
+    name: "{{ hostvars[item].gce_name }}"
+    groups: nodes
     openshift_node_labels:
       role: app
-  with_items: "{{ groups['tag_ocp-node'] | default([])  }}"
+  with_items: "{{ groups['tag_ocp-node'] | default([]) | difference(groups['tag_ocp-bootstrap'] | default([])) }}"
 
-- name: Mark all bootstrap nodes with the right Ansible flag
-  set_fact:
+- name: Add bootstrap node instances
+  add_host:
+    name: "{{ hostvars[item].gce_name }}"
+    groups: bootstrap_nodes
     openshift_node_bootstrap: True
-  delegate_to: "{{ hostvars[item].gce_name }}"
-  delegate_facts: True
-  with_items: "{{ groups['tag_ocp-bootstrap'] | default([])  }}"
+  with_items: "{{ groups['tag_ocp-node'] | default([]) | intersect(groups['tag_ocp-bootstrap'] | default([])) }}"
+  when: not (openshift_node_bootstrap | default(False))
