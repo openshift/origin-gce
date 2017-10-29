@@ -25,6 +25,10 @@ if ! whoami &>/dev/null; then
   fi
 fi
 
+# Provide a "files_dir" variable that points to playbooks/files 
+mkdir -p "${WORK}/inventory/host_vars/localhost"
+echo "files_dir: ${WORK}/playbooks/files" > "${WORK}/inventory/host_vars/localhost/01_default_files_dir.yaml"
+
 find "${WORK}/playbooks/files" | xargs -L1 -I {} ln -fs {} "${WORK}/inventory/"
 find "${WORK}/playbooks/files" -name *.yaml -or -name vars | xargs -L1 -I {} ln -fs {} "${WORK}/inventory/group_vars/all"
 

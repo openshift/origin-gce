@@ -24,8 +24,8 @@
 
     - name: Launch the image build instance
       gce:
-        service_account_email: "{{ (lookup('file', gce_service_account_keyfile ) | from_json ).client_email }}"
-        credentials_file: "{{ gce_service_account_keyfile }}"
+        service_account_email: "{{ (lookup('file', openshift_gcp_iam_service_account_keyfile ) | from_json ).client_email }}"
+        credentials_file: "{{ openshift_gcp_iam_service_account_keyfile }}"
         project_id: "{{ openshift_gcp_project }}"
         zone: "{{ openshift_gcp_zone }}"
         machine_type: n1-standard-1
