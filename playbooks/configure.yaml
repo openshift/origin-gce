@@ -46,6 +46,7 @@
 - hosts: primary_master
   gather_facts: no
   roles:
+    - gce-master-bootstrap
     - openshift-roles
     - master-validate
 
