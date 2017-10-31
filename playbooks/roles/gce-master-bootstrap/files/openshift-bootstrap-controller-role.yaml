@@ -18,3 +18,4 @@ rules:
   - certificatesigningrequests/approval
   verbs:
   - create
+  - update

@@ -1,5 +1,8 @@
 # This playbook launches a new cluster or converges it if already launched
 
+- include: build_image.yaml
+  when: openshift_gcp_build_image | default(False) | bool
+
 - import_playbook: provision.yaml
 
 - hosts: localhost
