@@ -1,9 +1,9 @@
 # This playbook launches a new cluster or converges it if already launched
 
-- include: provision.yaml
+- import_playbook: provision.yaml
 
 - hosts: localhost
   tasks:
   - meta: refresh_inventory
 
-- include: configure.yaml
+- import_playbook: configure.yaml

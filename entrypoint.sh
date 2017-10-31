@@ -25,6 +25,15 @@ if ! whoami &>/dev/null; then
   fi
 fi
 
+# Provide a "files_dir" variable that points to playbooks/files
+mkdir -p "${WORK}/inventory/group_vars/all"
+echo "files_dir: ${WORK}/playbooks/files" > "${WORK}/inventory/group_vars/all/00_default_files_dir.yaml"
+
+# Set inventory_dir for legacy support for old configs - Ansible 2.4 no longer has inventory_dir set on
+# localhost
+# DEPRECATED: will be removed when all config switches over
+mkdir -p "${WORK}/inventory/host_vars/localhost"
+echo "inventory_dir: ${WORK}/inventory" > "${WORK}/inventory/host_vars/localhost/01_default_inventory_dir.yaml"
 find "${WORK}/playbooks/files" | xargs -L1 -I {} ln -fs {} "${WORK}/inventory/"
 find "${WORK}/playbooks/files" -name *.yaml -or -name vars | xargs -L1 -I {} ln -fs {} "${WORK}/inventory/group_vars/all"
 
