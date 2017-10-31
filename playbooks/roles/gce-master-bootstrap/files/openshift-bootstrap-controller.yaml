@@ -44,7 +44,7 @@ spec:
           username=\${4}
 
           # auto approve
-          if [[ -z "\${condition}" && "\${username}" == "system:serviceaccount:openshift-infra:node-bootstrapper" ]]; then
+          if [[ -z "\${condition}" && ("\${username}" == "system:serviceaccount:openshift-infra:node-bootstrapper" || "\${username}" == "system:node:"* ) ]]; then
             oc adm certificate approve "\${name}"
             exit 0
           fi
@@ -65,4 +65,4 @@ spec:
           SCRIPT
           chmod u+x /tmp/signer
 
-          oc observe csr -a '{.status.conditions[*].type}' -a '{.status.certificate}' -a '{.spec.username}' -- /tmp/signer
+          oc observe csr --maximum-errors=1 --resync-period=10m -a '{.status.conditions[*].type}' -a '{.status.certificate}' -a '{.spec.username}' -- /tmp/signer
