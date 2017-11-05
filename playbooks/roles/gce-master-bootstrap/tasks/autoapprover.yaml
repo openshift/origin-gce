@@ -10,6 +10,7 @@
     - "*.yaml"
 
 - name: Set auto-approver nodeSelector
+  run_once: true
   yedit:
     src: "/tmp/openshift-approver/openshift-bootstrap-controller.yaml"
     key: spec.template.spec.nodeSelector
