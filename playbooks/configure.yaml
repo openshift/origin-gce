@@ -11,24 +11,12 @@
     - gce-cloudconfig
     - frequent-log-rotation
 
-# 3.7 requires std_include in order to invoke os_firewall (for now). Conditionally include it so
-# we don't break for older versions. Should be removed when os_firewall becomes a module.
-- hosts: localhost
-  tasks:
-    - stat: path=/usr/share/ansible/openshift-ansible/playbooks/common/openshift-cluster/std_include.yml
-      register: std_include
-      become: no
-- import_playbook: /usr/share/ansible/openshift-ansible/playbooks/byo/openshift-cluster/initialize_groups.yml
-- import_playbook: /usr/share/ansible/openshift-ansible/playbooks/common/openshift-cluster/std_include.yml
+- import_playbook: /usr/share/ansible/openshift-ansible/playbooks/init/main.yml
 
 - hosts: masters
   gather_facts: no
   roles:
     - master-http-proxy
-    - role: /usr/share/ansible/openshift-ansible/roles/os_firewall
-      os_firewall_allow:
-        - service: master http proxy
-          port: 8080/tcp
 
 - import_playbook: /usr/share/ansible/openshift-ansible/playbooks/byo/config.yml
 
