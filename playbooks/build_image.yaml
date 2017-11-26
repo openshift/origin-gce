@@ -68,7 +68,7 @@
       set_fact:
         openshift_node_bootstrap: True
 
-- import_playbook: /usr/share/ansible/openshift-ansible/playbooks/common/openshift-node/image_prep.yml
+- import_playbook: /usr/share/ansible/openshift-ansible/playbooks/openshift-node/private/image_prep.yml
 
 - hosts: nodes
   roles:
