@@ -18,7 +18,8 @@
   roles:
     - master-http-proxy
 
-- import_playbook: /usr/share/ansible/openshift-ansible/playbooks/byo/config.yml
+- import_playbook: /usr/share/ansible/openshift-ansible/playbooks/prerequisites.yml
+- import_playbook: /usr/share/ansible/openshift-ansible/playbooks/deploy_cluster.yml
 
 - hosts: primary_master
   gather_facts: no
