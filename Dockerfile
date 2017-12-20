@@ -41,10 +41,10 @@ RUN mkdir -p /usr/share/ansible $HOME/.ssh $WORK/playbooks/files && \
     INSTALL_PKGS="openssl gettext sudo epel-release" && \
     yum install -y $INSTALL_PKGS && \
     rpm -V $INSTALL_PKGS && \
-    INSTALL_PKGS="gcc python-devel python-dns python2-pip pyOpenSSL openssl gettext sudo" && \
+    INSTALL_PKGS="gcc python-devel python-dns python2-crypto python2-pip pyOpenSSL openssl gettext sudo" && \
     yum install -y $INSTALL_PKGS && \
     rpm -V $INSTALL_PKGS && \
-    pip install junit_xml pycrypto apache-libcloud && \
+    pip install junit_xml apache-libcloud && \
     yum install -y ansible && \
     yum clean all && \
     cd /usr/share/ansible && \
